@@ -1,5 +1,5 @@
-use bevy::prelude::*;
 use bevy::input::mouse::MouseMotion;
+use bevy::prelude::*;
 
 fn main() {
     App::new()
@@ -13,24 +13,25 @@ pub struct VorldPlugin;
 
 impl Plugin for VorldPlugin {
     fn build(&self, app: &mut App) {
-        app
-            .insert_resource(GameState { cursor_locked: false })
-            .add_startup_system(setup)
-            .add_system(grab_mouse)
-            .add_system(move_camera)
-            .add_system(rotate_camera);
+        app.insert_resource(GameState {
+            cursor_locked: false,
+        })
+        .add_startup_system(setup)
+        .add_system(grab_mouse)
+        .add_system(move_camera)
+        .add_system(rotate_camera);
     }
 }
 
 struct GameState {
-    cursor_locked: bool
+    cursor_locked: bool,
 }
 
 fn grab_mouse(
     mut windows: ResMut<Windows>,
     mut game_state: ResMut<GameState>,
     mouse_button_input: Res<Input<MouseButton>>,
-    keyboard_input: Res<Input<KeyCode>>
+    keyboard_input: Res<Input<KeyCode>>,
 ) {
     let window = windows.get_primary_mut().unwrap();
     if mouse_button_input.just_pressed(MouseButton::Left) {
@@ -48,8 +49,8 @@ fn grab_mouse(
 fn move_camera(
     time: Res<Time>,
     keyboard_input: Res<Input<KeyCode>>,
-    mut camera_query: Query<&mut Transform, With<Camera>>) {
-
+    mut camera_query: Query<&mut Transform, With<Camera>>,
+) {
     let movement_speed = 5.0;
     let mut camera_transform = camera_query.iter_mut().last().unwrap();
     let mut delta_x = 0.0;
@@ -79,8 +80,8 @@ fn rotate_camera(
     time: Res<Time>,
     game_state: Res<GameState>,
     mut mouse_motion_events: EventReader<MouseMotion>,
-    mut camera_query: Query<&mut Transform, With<Camera>>) {
-
+    mut camera_query: Query<&mut Transform, With<Camera>>,
+) {
     let rotation_speed = 0.1;
 
     if game_state.cursor_locked && !mouse_motion_events.is_empty() {
@@ -98,8 +99,8 @@ fn rotate_camera(
 fn setup(
     mut commands: Commands,
     mut meshes: ResMut<Assets<Mesh>>,
-    mut materials: ResMut<Assets<StandardMaterial>>)
-{
+    mut materials: ResMut<Assets<StandardMaterial>>,
+) {
     let green = Color::rgb_u8(0, 90, 20);
     let blue = Color::rgb_u8(0, 40, 90);
 
@@ -110,44 +111,49 @@ fn setup(
     let cube_mesh = meshes.add(Mesh::from(shape::Cube { size: 1.0 }));
 
     // Would like some good old gourd shading really but for now PBR as bevy comes with it
-    commands.spawn_bundle(PbrBundle { 
-       mesh: floor_mesh,
-       material: floor_material,
-       .. default()
+    commands.spawn_bundle(PbrBundle {
+        mesh: floor_mesh,
+        material: floor_material,
+        ..default()
     });
 
     for i in 0..4 {
-       commands.spawn_bundle(PbrBundle {
-           mesh: cube_mesh.clone(),
-           material: cube_material.clone(),
-           transform: Transform::from_xyz(8.0 * (i as f32 - 1.5), 0.5, 8.0),
-           .. default()
-       });
-       commands.spawn_bundle(PbrBundle {
-           mesh: cube_mesh.clone(),
-           material: cube_material.clone(),
-           transform: Transform::from_xyz(8.0 * (i as f32 - 1.5), 0.5, -8.0),
-           .. default()
-       });
+        commands.spawn_bundle(PbrBundle {
+            mesh: cube_mesh.clone(),
+            material: cube_material.clone(),
+            transform: Transform::from_xyz(8.0 * (i as f32 - 1.5), 0.5, 8.0),
+            ..default()
+        });
+        commands.spawn_bundle(PbrBundle {
+            mesh: cube_mesh.clone(),
+            material: cube_material.clone(),
+            transform: Transform::from_xyz(8.0 * (i as f32 - 1.5), 0.5, -8.0),
+            ..default()
+        });
     }
 
     // Lighting
     commands.insert_resource(AmbientLight::default());
 
     commands.spawn_bundle(DirectionalLightBundle {
-       directional_light: DirectionalLight {
-           color: Color::rgba_u8(230, 220, 200, 255),
-           illuminance: 10000.0,
-           shadows_enabled: true,
-           .. default()
-       },
-       transform: Transform::from_xyz(0.0, 10.0, 0.0).with_rotation(Quat::from_euler(EulerRot::XYZ, -45.0, -20.0, 0.0)),
-       .. default()
+        directional_light: DirectionalLight {
+            color: Color::rgba_u8(230, 220, 200, 255),
+            illuminance: 10000.0,
+            shadows_enabled: true,
+            ..default()
+        },
+        transform: Transform::from_xyz(0.0, 10.0, 0.0).with_rotation(Quat::from_euler(
+            EulerRot::XYZ,
+            -45.0,
+            -20.0,
+            0.0,
+        )),
+        ..default()
     });
 
     // Camera
     commands.spawn_bundle(Camera3dBundle {
-       transform: Transform::from_xyz(0.0, 1.75, 0.0),
-       .. default()
+        transform: Transform::from_xyz(0.0, 1.75, 0.0),
+        ..default()
     });
 }
