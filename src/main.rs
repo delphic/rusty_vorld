@@ -1,4 +1,5 @@
 use bevy::prelude::*;
+use bevy::input::mouse::MouseMotion;
 
 fn main() {
     App::new()
@@ -12,8 +13,35 @@ pub struct VorldPlugin;
 
 impl Plugin for VorldPlugin {
     fn build(&self, app: &mut App) {
-        app.add_startup_system(setup)
-            .add_system(move_camera);
+        app
+            .insert_resource(GameState { cursor_locked: false })
+            .add_startup_system(setup)
+            .add_system(grab_mouse)
+            .add_system(move_camera)
+            .add_system(rotate_camera);
+    }
+}
+
+struct GameState {
+    cursor_locked: bool
+}
+
+fn grab_mouse(
+    mut windows: ResMut<Windows>,
+    mut game_state: ResMut<GameState>,
+    mouse_button_input: Res<Input<MouseButton>>,
+    keyboard_input: Res<Input<KeyCode>>
+) {
+    let window = windows.get_primary_mut().unwrap();
+    if mouse_button_input.just_pressed(MouseButton::Left) {
+        window.set_cursor_visibility(false);
+        window.set_cursor_lock_mode(true);
+        game_state.cursor_locked = true;
+    }
+    if keyboard_input.just_pressed(KeyCode::Escape) {
+        window.set_cursor_visibility(true);
+        window.set_cursor_lock_mode(false);
+        game_state.cursor_locked = false;
     }
 }
 
@@ -40,9 +68,32 @@ fn move_camera(
         delta_z += 1.0;
     }
 
-    camera_transform.translation += movement_speed * time.delta().as_secs_f32() * Vec3 { x: delta_x, y: 0.0, z: delta_z };
+    let local_x = camera_transform.local_x();
+    let local_z = camera_transform.local_z();
+
+    camera_transform.translation += movement_speed * time.delta().as_secs_f32() * delta_x * local_x;
+    camera_transform.translation += movement_speed * time.delta().as_secs_f32() * delta_z * local_z;
 }
 
+fn rotate_camera(
+    time: Res<Time>,
+    game_state: Res<GameState>,
+    mut mouse_motion_events: EventReader<MouseMotion>,
+    mut camera_query: Query<&mut Transform, With<Camera>>) {
+
+    let rotation_speed = 0.1;
+
+    if game_state.cursor_locked && !mouse_motion_events.is_empty() {
+        let mut camera_transform = camera_query.iter_mut().last().unwrap();
+
+        for event in mouse_motion_events.iter() {
+            let delta = rotation_speed * time.delta().as_secs_f32() * event.delta;
+            let local_x = camera_transform.local_x();
+            camera_transform.rotate_axis(Vec3::Y, -delta.x);
+            camera_transform.rotate_axis(local_x, -delta.y);
+        }
+    }
+}
 
 fn setup(
     mut commands: Commands,
