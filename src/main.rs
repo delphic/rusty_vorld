@@ -19,13 +19,24 @@ impl Plugin for VorldPlugin {
         .add_startup_system(setup)
         .add_system(grab_mouse)
         .add_system(move_camera)
-        .add_system(rotate_camera);
+        .add_system(rotate_camera)
+        .add_system(update_debug_text);
     }
+}
+
+#[derive(Component)]
+struct DebugText;
+
+#[derive(Component)]
+struct PlayerCamera {
+    /// The desired angle around the local x axis
+    pitch: f32, 
 }
 
 struct GameState {
     cursor_locked: bool,
 }
+
 
 fn grab_mouse(
     mut windows: ResMut<Windows>,
@@ -49,7 +60,7 @@ fn grab_mouse(
 fn move_camera(
     time: Res<Time>,
     keyboard_input: Res<Input<KeyCode>>,
-    mut camera_query: Query<&mut Transform, With<Camera>>,
+    mut camera_query: Query<&mut Transform, With<PlayerCamera>>,
 ) {
     let movement_speed = 5.0;
     let mut camera_transform = camera_query.iter_mut().last().unwrap();
@@ -76,28 +87,57 @@ fn move_camera(
     camera_transform.translation += movement_speed * time.delta().as_secs_f32() * delta_z * local_z;
 }
 
+fn clamp(value: f32, min: f32, max: f32) -> f32 {
+    if value < min {
+        min
+    } else if value > max {
+        max
+    } else {
+        value
+    }
+}
+
 fn rotate_camera(
     time: Res<Time>,
     game_state: Res<GameState>,
     mut mouse_motion_events: EventReader<MouseMotion>,
-    mut camera_query: Query<&mut Transform, With<Camera>>,
+    mut camera_query: Query<(&mut Transform, &mut PlayerCamera)>,
 ) {
     let rotation_speed = 0.1;
 
     if game_state.cursor_locked && !mouse_motion_events.is_empty() {
-        let mut camera_transform = camera_query.iter_mut().last().unwrap();
+        let (mut camera_transform, mut player_camera ) = camera_query.iter_mut().last().unwrap();
+
+        let clamp_angle = std::f32::consts::PI * (0.5 - 10.0 / 180.0); // prevent rotation past 10 degrees
 
         for event in mouse_motion_events.iter() {
-            let delta = rotation_speed * time.delta().as_secs_f32() * event.delta;
+            let scaled_mouse_delta = rotation_speed * time.delta().as_secs_f32() * event.delta;
             let local_x = camera_transform.local_x();
-            camera_transform.rotate_axis(Vec3::Y, -delta.x);
-            camera_transform.rotate_axis(local_x, -delta.y);
+            let pitch = player_camera.pitch;
+            let new_pitch = clamp(pitch - scaled_mouse_delta.y, -clamp_angle, clamp_angle);
+
+            camera_transform.rotate_axis(Vec3::Y, -scaled_mouse_delta.x);
+            camera_transform.rotate_axis(local_x, new_pitch - pitch);
+
+            player_camera.pitch = new_pitch;
         }
+    }
+}
+
+fn update_debug_text(
+    mut text_query: Query<&mut Text, With<DebugText>>,
+    camera_query: Query<&PlayerCamera>,
+) {
+    let camera_transform = camera_query.iter().last().unwrap();
+
+    for mut text in text_query.iter_mut() {
+        text.sections[0].value = format!("{:?}", camera_transform.pitch * 180.0 / std::f32::consts::PI);
     }
 }
 
 fn setup(
     mut commands: Commands,
+    asset_server: Res<AssetServer>,
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
 ) {
@@ -155,5 +195,19 @@ fn setup(
     commands.spawn_bundle(Camera3dBundle {
         transform: Transform::from_xyz(0.0, 1.75, 0.0),
         ..default()
-    });
+    }).insert(PlayerCamera { pitch: 0.0 });
+
+    // Debug Text
+    commands.spawn_bundle(
+        TextBundle::from_section("Debug", TextStyle { 
+            font: asset_server.load("fonts/FiraSans-Bold.ttf"),
+            font_size: 64.0,
+            color: Color::WHITE,
+        })
+        .with_text_alignment(TextAlignment::TOP_CENTER)
+        .with_style(Style { 
+            align_self: AlignSelf::FlexEnd,
+            .. default()
+        }))
+     .insert(DebugText);
 }
