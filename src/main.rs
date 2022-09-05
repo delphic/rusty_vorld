@@ -144,7 +144,11 @@ fn setup(
     let green = Color::rgb_u8(0, 90, 20);
     let blue = Color::rgb_u8(0, 40, 90);
 
-    let floor_material = materials.add(green.into());
+    let floor_material = materials.add(StandardMaterial { 
+        base_color: green,
+        perceptual_roughness: 1.0,
+        .. default()
+    });
     let cube_material = materials.add(blue.into());
 
     let floor_mesh = meshes.add(Mesh::from(shape::Plane { size: 32.0 }));
