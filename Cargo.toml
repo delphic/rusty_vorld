@@ -8,3 +8,4 @@ authors = [ "Harry Jones <harry@badprophecy.games>" ]
 
 [dependencies]
 bevy = "0.8.1"
+bevy_rapier3d = { version="0.16.2", features = ["debug-render" ] }

@@ -1,10 +1,12 @@
-use bevy::input::mouse::MouseMotion;
-use bevy::prelude::*;
+use bevy::{ prelude::*, input::mouse::MouseMotion };
+use bevy_rapier3d::prelude::*;
 
 fn main() {
     App::new()
         .insert_resource(Msaa { samples: 4 })
         .add_plugins(DefaultPlugins)
+        .add_plugin(RapierPhysicsPlugin::<NoUserData>::default())
+        .add_plugin(RapierDebugRenderPlugin::default())
         .add_plugin(VorldPlugin)
         .run();
 }
@@ -37,7 +39,6 @@ struct GameState {
     cursor_locked: bool,
 }
 
-
 fn grab_mouse(
     mut windows: ResMut<Windows>,
     mut game_state: ResMut<GameState>,
@@ -60,6 +61,7 @@ fn grab_mouse(
 fn move_camera(
     time: Res<Time>,
     keyboard_input: Res<Input<KeyCode>>,
+    rapier_context: Res<RapierContext>,
     mut camera_query: Query<&mut Transform, With<PlayerCamera>>,
 ) {
     let movement_speed = 5.0;
@@ -83,8 +85,22 @@ fn move_camera(
     let local_x = camera_transform.local_x();
     let local_z = camera_transform.local_z();
 
-    camera_transform.translation += movement_speed * time.delta().as_secs_f32() * delta_x * local_x;
-    camera_transform.translation += movement_speed * time.delta().as_secs_f32() * delta_z * local_z;
+    let velocity = movement_speed * delta_x * local_x + movement_speed * delta_z * local_z;
+    let time_delta = time.delta_seconds();
+
+    let shape = Collider::ball(0.25);
+    if let Some((_entity, hit)) = rapier_context.cast_shape(
+        camera_transform.translation,
+        Quat::IDENTITY,
+        velocity,
+        &shape,
+        time_delta,
+        QueryFilter::default()
+    ) {
+        camera_transform.translation += velocity * hit.toi - velocity.normalize() * 0.01;
+    } else {
+        camera_transform.translation += velocity * time_delta;
+    }
 }
 
 fn clamp(value: f32, min: f32, max: f32) -> f32 {
@@ -159,7 +175,7 @@ fn setup(
         mesh: floor_mesh,
         material: floor_material,
         ..default()
-    });
+    }).insert(Collider::cuboid(16.0, 0.001, 16.0));
 
     for i in 0..4 {
         commands.spawn_bundle(PbrBundle {
@@ -167,13 +183,13 @@ fn setup(
             material: cube_material.clone(),
             transform: Transform::from_xyz(8.0 * (i as f32 - 1.5), 0.5, 8.0),
             ..default()
-        });
+        }).insert(Collider::cuboid(0.5, 0.5, 0.5));
         commands.spawn_bundle(PbrBundle {
             mesh: cube_mesh.clone(),
             material: cube_material.clone(),
             transform: Transform::from_xyz(8.0 * (i as f32 - 1.5), 0.5, -8.0),
             ..default()
-        });
+        }).insert(Collider::cuboid(0.5, 0.5, 0.5));
     }
 
     // Lighting
@@ -199,7 +215,9 @@ fn setup(
     commands.spawn_bundle(Camera3dBundle {
         transform: Transform::from_xyz(0.0, 1.75, 0.0),
         ..default()
-    }).insert(PlayerCamera { pitch: 0.0 });
+    }).insert(PlayerCamera {
+        pitch: 0.0
+    });
 
     // Debug Text
     commands.spawn_bundle(
@@ -213,5 +231,5 @@ fn setup(
             align_self: AlignSelf::FlexEnd,
             .. default()
         }))
-     .insert(DebugText);
+    .insert(DebugText);
 }
