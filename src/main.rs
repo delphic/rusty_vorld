@@ -21,13 +21,9 @@ impl Plugin for VorldPlugin {
         .add_startup_system(setup)
         .add_system(grab_mouse)
         .add_system(move_camera)
-        .add_system(rotate_camera)
-        .add_system(update_debug_text);
+        .add_system(rotate_camera);
     }
 }
-
-#[derive(Component)]
-struct DebugText;
 
 #[derive(Component)]
 struct PlayerCamera {
@@ -89,18 +85,46 @@ fn move_camera(
     let time_delta = time.delta_seconds();
 
     let shape = Collider::ball(0.25);
-    if let Some((_entity, hit)) = rapier_context.cast_shape(
+    let start_translation = camera_transform.translation;
+
+    if let Some((_, hit)) = rapier_context.cast_shape(
         camera_transform.translation,
         Quat::IDENTITY,
         velocity,
         &shape,
-        time_delta,
+        time_delta + 0.001,
         QueryFilter::default()
     ) {
-        camera_transform.translation += velocity * hit.toi - velocity.normalize() * 0.01;
-    } else {
+        if hit.toi == 0.0 {
+            panic!("Started camera movement already overlapping");
+        } else {
+            let stop_time = f32::max(hit.toi - 0.001, 0.0); // adjusted to allow for a minimum separation - TODO: should do this by distance not time
+            camera_transform.translation += velocity * stop_time;
+            
+            let time_remainder = time_delta - stop_time;
+            let velocity_remainder = velocity * time_remainder / time_delta;
+            let slide_velocity = velocity_remainder - velocity_remainder.dot(hit.normal1) * hit.normal1;
+            if rapier_context.cast_shape(
+                camera_transform.translation,
+                Quat::IDENTITY,
+                slide_velocity,
+                &shape,
+                time_remainder + 0.001,
+                QueryFilter::default()).is_none() {
+                    camera_transform.translation += slide_velocity * time_remainder;
+            } // TODO: Attempt move up to new contact and second slide axis before giving up
+        }
+    } else if velocity.length_squared() > 0.0 {
         camera_transform.translation += velocity * time_delta;
     }
+
+    rapier_context.intersections_with_shape(camera_transform.translation, Quat::IDENTITY, &shape, QueryFilter::default(), |_| {
+        // Cast Shape sometimes lies about there being no collision due to float precision issues,
+        // so check for intersections and if found restore to starting position
+        println!("[Error] Camera shape found to intersect world collider after movement, restoring to last valid position");
+        camera_transform.translation = start_translation;
+        false
+    });
 }
 
 fn clamp(value: f32, min: f32, max: f32) -> f32 {
@@ -128,7 +152,8 @@ fn rotate_camera(
 
         for event in mouse_motion_events.iter() {
             let scaled_mouse_delta = rotation_speed * time.delta().as_secs_f32() * event.delta;
-            let local_x = camera_transform.local_x();
+            
+            let local_x = Vec3::new(camera_transform.local_x().x, 0.0, camera_transform.local_x().z);
             let pitch = player_camera.pitch;
             let new_pitch = clamp(pitch - scaled_mouse_delta.y, -clamp_angle, clamp_angle);
 
@@ -140,20 +165,8 @@ fn rotate_camera(
     }
 }
 
-fn update_debug_text(
-    mut text_query: Query<&mut Text, With<DebugText>>,
-    camera_query: Query<&PlayerCamera>,
-) {
-    let camera_transform = camera_query.iter().last().unwrap();
-
-    for mut text in text_query.iter_mut() {
-        text.sections[0].value = format!("{:?}", camera_transform.pitch * 180.0 / std::f32::consts::PI);
-    }
-}
-
 fn setup(
     mut commands: Commands,
-    asset_server: Res<AssetServer>,
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
 ) {
@@ -218,18 +231,4 @@ fn setup(
     }).insert(PlayerCamera {
         pitch: 0.0
     });
-
-    // Debug Text
-    commands.spawn_bundle(
-        TextBundle::from_section("Debug", TextStyle { 
-            font: asset_server.load("fonts/FiraSans-Bold.ttf"),
-            font_size: 64.0,
-            color: Color::WHITE,
-        })
-        .with_text_alignment(TextAlignment::TOP_CENTER)
-        .with_style(Style { 
-            align_self: AlignSelf::FlexEnd,
-            .. default()
-        }))
-    .insert(DebugText);
 }
