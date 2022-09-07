@@ -1,4 +1,4 @@
-use bevy::{ prelude::*, input::mouse::MouseMotion };
+use bevy::{input::mouse::MouseMotion, prelude::*};
 
 pub struct PlayerInput {
     pub mouse_motion: Vec2,
@@ -6,14 +6,14 @@ pub struct PlayerInput {
 }
 
 pub fn insert_resources(app: &mut App) {
-	app.insert_resource(PlayerInput {
-		mouse_motion: Vec2::ZERO,
-		movement_direction: Vec3::ZERO
-	});
+    app.insert_resource(PlayerInput {
+        mouse_motion: Vec2::ZERO,
+        movement_direction: Vec3::ZERO,
+    });
 }
 
 pub fn add_systems(app: &mut App) {
-	app.add_system(detect_player_input);
+    app.add_system(detect_player_input);
 }
 
 fn detect_player_input(

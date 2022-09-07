@@ -9,10 +9,10 @@ pub fn spawn(
     let green = Color::rgb_u8(0, 90, 20);
     let blue = Color::rgb_u8(0, 40, 90);
 
-    let floor_material = materials.add(StandardMaterial { 
+    let floor_material = materials.add(StandardMaterial {
         base_color: green,
         perceptual_roughness: 1.0,
-        .. default()
+        ..default()
     });
     let cube_material = materials.add(blue.into());
 
@@ -20,25 +20,31 @@ pub fn spawn(
     let cube_mesh = meshes.add(Mesh::from(shape::Cube { size: 1.0 }));
 
     // Would like some good old gourd shading really but for now PBR as bevy comes with it
-    commands.spawn_bundle(PbrBundle {
-        mesh: floor_mesh,
-        material: floor_material,
-        ..default()
-    }).insert(Collider::cuboid(16.0, 0.001, 16.0));
+    commands
+        .spawn_bundle(PbrBundle {
+            mesh: floor_mesh,
+            material: floor_material,
+            ..default()
+        })
+        .insert(Collider::cuboid(16.0, 0.001, 16.0));
 
     for i in 0..4 {
-        commands.spawn_bundle(PbrBundle {
-            mesh: cube_mesh.clone(),
-            material: cube_material.clone(),
-            transform: Transform::from_xyz(8.0 * (i as f32 - 1.5), 0.5, 8.0),
-            ..default()
-        }).insert(Collider::cuboid(0.5, 0.5, 0.5));
-        commands.spawn_bundle(PbrBundle {
-            mesh: cube_mesh.clone(),
-            material: cube_material.clone(),
-            transform: Transform::from_xyz(8.0 * (i as f32 - 1.5), 0.5, -8.0),
-            ..default()
-        }).insert(Collider::cuboid(0.5, 0.5, 0.5));
+        commands
+            .spawn_bundle(PbrBundle {
+                mesh: cube_mesh.clone(),
+                material: cube_material.clone(),
+                transform: Transform::from_xyz(8.0 * (i as f32 - 1.5), 0.5, 8.0),
+                ..default()
+            })
+            .insert(Collider::cuboid(0.5, 0.5, 0.5));
+        commands
+            .spawn_bundle(PbrBundle {
+                mesh: cube_mesh.clone(),
+                material: cube_material.clone(),
+                transform: Transform::from_xyz(8.0 * (i as f32 - 1.5), 0.5, -8.0),
+                ..default()
+            })
+            .insert(Collider::cuboid(0.5, 0.5, 0.5));
     }
 
     // Lighting
