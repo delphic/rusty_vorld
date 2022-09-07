@@ -1,5 +1,6 @@
 use bevy::prelude::*;
 use bevy_rapier3d::prelude::*;
+
 use crate::input::PlayerInput;
 use crate::debug;
 use crate::utils;
