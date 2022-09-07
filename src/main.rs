@@ -19,8 +19,13 @@ impl Plugin for VorldPlugin {
         app.insert_resource(GameState {
             cursor_locked: false,
         })
+        .insert_resource(PlayerInput {
+            mouse_motion: Vec2::ZERO,
+            movement_direction: Vec3::ZERO
+        })
         .add_startup_system(setup)
         .add_system(grab_mouse)
+        .add_system(detect_player_input)
         .add_system(move_camera)
         .add_system(rotate_camera);
     }
@@ -32,6 +37,11 @@ struct PlayerCamera {
     pitch: f32,
     /// The desired angle around the global y axis, 0 -> 2π
     yaw: f32,
+}
+
+struct PlayerInput {
+    mouse_motion: Vec2,
+    movement_direction: Vec3,
 }
 
 struct GameState {
@@ -57,14 +67,12 @@ fn grab_mouse(
     }
 }
 
-fn move_camera(
-    time: Res<Time>,
+fn detect_player_input(
+    game_state: Res<GameState>,
     keyboard_input: Res<Input<KeyCode>>,
-    rapier_context: Res<RapierContext>,
-    mut camera_query: Query<&mut Transform, With<PlayerCamera>>,
+    mut player_input: ResMut<PlayerInput>,
+    mut mouse_motion_events: EventReader<MouseMotion>,
 ) {
-    let movement_speed = 5.0;
-    let mut camera_transform = camera_query.iter_mut().last().unwrap();
     let mut delta_x = 0.0;
     if keyboard_input.pressed(KeyCode::A) {
         delta_x -= 1.0;
@@ -81,10 +89,30 @@ fn move_camera(
         delta_z += 1.0;
     }
 
+    player_input.movement_direction = Vec3::new(delta_x, 0.0, delta_z);
+
+    player_input.mouse_motion = Vec2::ZERO;
+    if game_state.cursor_locked && !mouse_motion_events.is_empty() {
+        for event in mouse_motion_events.iter() {
+            player_input.mouse_motion += event.delta;
+        }
+    }
+}
+
+fn move_camera(
+    time: Res<Time>,
+    player_input: Res<PlayerInput>,
+    rapier_context: Res<RapierContext>,
+    mut camera_query: Query<&mut Transform, With<PlayerCamera>>,
+) {
+    let movement_speed = 5.0;
+    let mut camera_transform = camera_query.iter_mut().last().unwrap();
+
     let local_x = camera_transform.local_x();
     let local_z = camera_transform.local_z();
 
-    let velocity = movement_speed * delta_x * local_x + movement_speed * delta_z * local_z;
+    let velocity = movement_speed * player_input.movement_direction.x * local_x 
+        + movement_speed * player_input.movement_direction.z * local_z;
 
     if velocity.length_squared() > 0.0 {
         let time_delta = time.delta_seconds();
@@ -182,35 +210,27 @@ fn clamp(value: f32, min: f32, max: f32) -> f32 {
 
 fn rotate_camera(
     time: Res<Time>,
-    game_state: Res<GameState>,
-    mut mouse_motion_events: EventReader<MouseMotion>,
+    player_input: Res<PlayerInput>,
     mut camera_query: Query<(&mut Transform, &mut PlayerCamera)>,
 ) {
     let rotation_speed = 0.1;
 
-    if game_state.cursor_locked && !mouse_motion_events.is_empty() {
-        if let Some((mut camera_transform, mut player_camera)) = camera_query.iter_mut().last() {
-            // prevent rotation past 10 degrees towards vertical
-            let clamp_angle = std::f32::consts::PI * (0.5 - 10.0 / 180.0); 
+    if let Some((mut camera_transform, mut player_camera)) = camera_query.iter_mut().last() {
+        // prevent rotation past 10 degrees towards vertical
+        let clamp_angle = std::f32::consts::PI * (0.5 - 10.0 / 180.0); 
 
-            let mut yaw = player_camera.yaw;
-            let mut pitch = player_camera.pitch;
+        let scaled_mouse_delta = rotation_speed * time.delta_seconds() * player_input.mouse_motion;
 
-            for event in mouse_motion_events.iter() {
-                let scaled_mouse_delta = rotation_speed * time.delta_seconds() * event.delta;
+        let yaw = (player_camera.yaw - scaled_mouse_delta.x) % (2.0 * std::f32::consts::PI);
+        let pitch = clamp(player_camera.pitch - scaled_mouse_delta.y, -clamp_angle, clamp_angle);
+        
+        camera_transform.rotation = Quat::IDENTITY;
+        camera_transform.rotate_axis(Vec3::Y, yaw);
+        let local_x = camera_transform.local_x();
+        camera_transform.rotate_axis(local_x, pitch);
 
-                yaw = (yaw - scaled_mouse_delta.x) % (2.0 * std::f32::consts::PI);
-                pitch = clamp(pitch - scaled_mouse_delta.y, -clamp_angle, clamp_angle);
-            }
-            
-            camera_transform.rotation = Quat::IDENTITY;
-            camera_transform.rotate_axis(Vec3::Y, yaw);
-            let local_x = camera_transform.local_x();
-            camera_transform.rotate_axis(local_x, pitch);
-
-            player_camera.yaw = yaw;
-            player_camera.pitch = pitch;
-        }
+        player_camera.yaw = yaw;
+        player_camera.pitch = pitch;
     }
 }
 
