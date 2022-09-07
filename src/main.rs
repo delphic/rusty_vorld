@@ -28,8 +28,10 @@ impl Plugin for VorldPlugin {
 
 #[derive(Component)]
 struct PlayerCamera {
-    /// The desired angle around the local x axis
-    pitch: f32, 
+    /// The desired angle around the local x axis, -π/2 -> π/2
+    pitch: f32,
+    /// The desired angle around the global y axis, 0 -> 2π
+    yaw: f32,
 }
 
 struct GameState {
@@ -147,21 +149,27 @@ fn rotate_camera(
     let rotation_speed = 0.1;
 
     if game_state.cursor_locked && !mouse_motion_events.is_empty() {
-        let (mut camera_transform, mut player_camera ) = camera_query.iter_mut().last().unwrap();
+        if let Some((mut camera_transform, mut player_camera)) = camera_query.iter_mut().last() {
+            // prevent rotation past 10 degrees towards vertical
+            let clamp_angle = std::f32::consts::PI * (0.5 - 10.0 / 180.0); 
 
-        let clamp_angle = std::f32::consts::PI * (0.5 - 10.0 / 180.0); // prevent rotation past 10 degrees
+            let mut yaw = player_camera.yaw;
+            let mut pitch = player_camera.pitch;
 
-        for event in mouse_motion_events.iter() {
-            let scaled_mouse_delta = rotation_speed * time.delta().as_secs_f32() * event.delta;
+            for event in mouse_motion_events.iter() {
+                let scaled_mouse_delta = rotation_speed * time.delta_seconds() * event.delta;
+
+                yaw = (yaw - scaled_mouse_delta.x) % (2.0 * std::f32::consts::PI);
+                pitch = clamp(pitch - scaled_mouse_delta.y, -clamp_angle, clamp_angle);
+            }
             
-            let local_x = Vec3::new(camera_transform.local_x().x, 0.0, camera_transform.local_x().z);
-            let pitch = player_camera.pitch;
-            let new_pitch = clamp(pitch - scaled_mouse_delta.y, -clamp_angle, clamp_angle);
+            camera_transform.rotation = Quat::IDENTITY;
+            camera_transform.rotate_axis(Vec3::Y, yaw);
+            let local_x = camera_transform.local_x();
+            camera_transform.rotate_axis(local_x, pitch);
 
-            camera_transform.rotate_axis(Vec3::Y, -scaled_mouse_delta.x);
-            camera_transform.rotate_axis(local_x, new_pitch - pitch);
-
-            player_camera.pitch = new_pitch;
+            player_camera.yaw = yaw;
+            player_camera.pitch = pitch;
         }
     }
 }
@@ -230,6 +238,7 @@ fn setup(
         transform: Transform::from_xyz(0.0, 1.75, 0.0),
         ..default()
     }).insert(PlayerCamera {
-        pitch: 0.0
+        pitch: 0.0,
+        yaw: 0.0,
     });
 }
