@@ -3,6 +3,7 @@ use bevy_rapier3d::prelude::*;
 
 mod debug;
 mod input;
+mod mesher;
 mod player_camera;
 mod test_scene_spawner;
 mod utils;
@@ -27,6 +28,8 @@ impl Plugin for VorldPlugin {
         input::insert_resources(app);
 
         app.add_startup_system(test_scene_spawner::spawn);
+        app.add_system(test_scene_spawner::asset_load_handler);
+        
         app.add_system(grab_mouse);
         input::add_systems(app);
         player_camera::add_systems(app);
