@@ -1,6 +1,7 @@
 use bevy::prelude::*;
 use bevy_rapier3d::prelude::*;
 
+mod atlas_loader;
 mod input;
 mod mesher;
 mod player_camera;
@@ -24,10 +25,10 @@ impl Plugin for VorldPlugin {
         app.insert_resource(GameState {
             cursor_locked: false,
         });
+        atlas_loader::init(app);
         input::insert_resources(app);
 
         app.add_startup_system(test_scene_spawner::spawn);
-        app.add_system(test_scene_spawner::asset_load_handler);
         
         app.add_system(grab_mouse);
         input::add_systems(app);
