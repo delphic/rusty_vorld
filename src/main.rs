@@ -1,7 +1,6 @@
 use bevy::prelude::*;
 use bevy_rapier3d::prelude::*;
 
-mod debug;
 mod input;
 mod mesher;
 mod player_camera;

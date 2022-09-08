@@ -1,7 +1,6 @@
 use bevy::prelude::*;
 use bevy_rapier3d::prelude::*;
 
-use super::debug;
 use super::input::PlayerInput;
 use super::utils;
 
@@ -128,7 +127,7 @@ fn move_camera(
         rapier_context.intersections_with_shape(camera_transform.translation, Quat::IDENTITY, &shape, QueryFilter::default(), |_| {
             // cast_shape sometimes lies about there being no collision due to float precision issues,
             // so check for intersections and if found restore to starting position
-            debug::log_warning("Camera shape found to intersect world collider after movement, restoring to last valid position");
+            warn!("Camera shape found to intersect world collider after movement, restoring to last valid position");
             camera_transform.translation = start_translation;
             false
         });
