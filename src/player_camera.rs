@@ -1,9 +1,9 @@
 use bevy::prelude::*;
 use bevy_rapier3d::prelude::*;
 
-use crate::debug;
-use crate::input::PlayerInput;
-use crate::utils;
+use super::debug;
+use super::input::PlayerInput;
+use super::utils;
 
 #[derive(Component)]
 struct PlayerCamera {

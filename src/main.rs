@@ -1,12 +1,11 @@
 use bevy::prelude::*;
 use bevy_rapier3d::prelude::*;
 
-pub mod debug;
-pub mod input;
-pub mod utils;
-
+mod debug;
+mod input;
 mod player_camera;
 mod test_scene_spawner;
+mod utils;
 
 fn main() {
     App::new()
