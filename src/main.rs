@@ -7,6 +7,7 @@ mod mesher;
 mod player_camera;
 mod test_scene_spawner;
 mod utils;
+mod voxel;
 
 fn main() {
     App::new()
@@ -26,10 +27,11 @@ impl Plugin for VorldPlugin {
             cursor_locked: false,
         });
         atlas_loader::init(app);
+        voxel::init(app);
         input::insert_resources(app);
 
         app.add_startup_system(test_scene_spawner::spawn);
-        
+
         app.add_system(grab_mouse);
         input::add_systems(app);
         player_camera::add_systems(app);
