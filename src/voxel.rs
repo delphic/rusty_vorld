@@ -39,10 +39,12 @@ impl Chunk {
     }
 }
 
+#[repr(u8)]
+#[allow(dead_code)]
 enum BlockIds {
     Air = 0,
     Grass = 1,
-    StoneBlocks = 2
+    StoneBlocks = 2,
 }
 
 pub fn init(app: &mut App) {
