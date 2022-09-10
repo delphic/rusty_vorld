@@ -21,7 +21,7 @@ pub fn add_systems(app: &mut App) {
 fn setup(mut commands: Commands) {
     commands
         .spawn_bundle(Camera3dBundle {
-            transform: Transform::from_xyz(0.0, 1.75, 0.0),
+            transform: Transform::from_xyz(0.0, 1.75, 16.0),
             ..default()
         })
         .insert(PlayerCamera {

@@ -1,6 +1,7 @@
 use super::atlas_loader::AtlasTexture;
 use super::mesher;
 use bevy::prelude::*;
+use bevy_rapier3d::prelude::*;
 use std::collections::HashMap;
 
 #[derive(Hash, Eq, PartialEq, Copy, Clone, Debug)]
@@ -38,10 +39,17 @@ impl Chunk {
     }
 }
 
+enum BlockIds {
+    Air = 0,
+    Grass = 1,
+    StoneBlocks = 2
+}
+
 pub fn init(app: &mut App) {
     let mut look_up = HashMap::new();
+    // GRASS
     look_up.insert(
-        1,
+        BlockIds::Grass as u8,
         HashMap::from([
             (Cardinal::Forward, 1),
             (Cardinal::Back, 1),
@@ -49,7 +57,19 @@ pub fn init(app: &mut App) {
             (Cardinal::Down, 2),
             (Cardinal::Right, 1),
             (Cardinal::Left, 1),
-        ]),
+        ])
+    );
+    // STONE BLOCKS
+    look_up.insert(
+        BlockIds::StoneBlocks as u8,
+        HashMap::from([
+            (Cardinal::Forward, 4),
+            (Cardinal::Back, 4),
+            (Cardinal::Up, 5),
+            (Cardinal::Down, 5),
+            (Cardinal::Right, 4),
+            (Cardinal::Left, 4),
+        ])
     );
 
     app.insert_resource(VoxelConfig { id_to_tile: look_up });
@@ -74,16 +94,27 @@ pub fn setup(
     };
     for x in 0..CHUNK_SIZE {
         for z in 0..CHUNK_SIZE {
-            chunk.add_voxel(1, x, 0, z);
+            chunk.add_voxel(BlockIds::Grass as u8, x, 0, z);
+            if x % 4 == 0 && z % 4 == 0 {
+                for y in 1..CHUNK_SIZE {
+                    chunk.add_voxel(BlockIds::StoneBlocks as u8, x, y, z);
+                }
+            }
         }
     }
     let mut tile_meshes = mesher::build_chunk_meshes(&chunk, &voxel_config);
 
     while let Some((tile_id, mesh)) = tile_meshes.pop() {
-        commands.spawn_bundle(MaterialMeshBundle {
+        let mut entity_commands = commands.spawn();
+        if let Some(collider) = Collider::from_bevy_mesh(&mesh, &ComputedColliderShape::TriMesh) {
+            entity_commands.insert(collider);
+        } else {
+            error!("Unable to generate mesh collider");
+        }
+        entity_commands.insert_bundle(MaterialMeshBundle {
             mesh: meshes.add(mesh),
             material: atlas.materials[&tile_id].clone(),
-            transform: Transform::from_xyz(0.0, 5.0, -4.0),
+            transform: Transform::from_xyz(-8.0, 0.0, -4.0),
             ..default()
         });
     }
