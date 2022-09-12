@@ -36,7 +36,7 @@ fn move_camera(
     rapier_context: Res<RapierContext>,
     mut camera_query: Query<&mut Transform, With<PlayerCamera>>,
 ) {
-    let movement_speed = 5.0; // TODO: degrees = dots * 0.022
+    let movement_speed = 10.0;
     let mut camera_transform = camera_query.iter_mut().last().unwrap();
 
     let local_x = camera_transform.local_x();
@@ -139,7 +139,7 @@ fn rotate_camera(
     player_input: Res<PlayerInput>,
     mut camera_query: Query<(&mut Transform, &mut PlayerCamera)>,
 ) {
-    let rotation_speed = 0.1;
+    let rotation_speed = 0.1; // TODO: degrees = dots * 0.022
 
     if let Some((mut camera_transform, mut player_camera)) = camera_query.iter_mut().last() {
         // prevent rotation past 10 degrees towards vertical

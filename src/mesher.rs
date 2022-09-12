@@ -7,28 +7,6 @@ use bevy::{
     render::{mesh::Mesh, render_resource::PrimitiveTopology},
 };
 
-// pub fn build_tile() -> Mesh {
-//     let vertices = [
-//         ([0.0, 0.0, 0.0], [0.0, 0.0, 1.0], [0.0, 1.0]),
-//         ([1.0, 0.0, 0.0], [0.0, 0.0, 1.0], [1.0, 1.0]),
-//         ([1.0, 1.0, 0.0], [0.0, 0.0, 1.0], [1.0, 0.0]),
-//         ([0.0, 1.0, 0.0], [0.0, 0.0, 1.0], [0.0, 0.0]),
-//     ];
-
-//     let positions: Vec<_> = vertices.iter().map(|(p, _, _)| *p).collect();
-//     let normals: Vec<_> = vertices.iter().map(|(_, n, _)| *n).collect();
-//     let uvs: Vec<_> = vertices.iter().map(|(_, _, uv)| *uv).collect();
-
-//     let indices = Indices::U32(vec![0, 1, 2, 0, 2, 3]);
-
-//     let mut mesh = Mesh::new(PrimitiveTopology::TriangleList);
-//     mesh.insert_attribute(Mesh::ATTRIBUTE_POSITION, positions);
-//     mesh.insert_attribute(Mesh::ATTRIBUTE_NORMAL, normals);
-//     mesh.insert_attribute(Mesh::ATTRIBUTE_UV_0, uvs);
-//     mesh.set_indices(Some(indices));
-//     mesh
-// }
-
 fn insert_tile(
     positions: &mut Vec<[f32; 3]>,
     normals: &mut Vec<[f32; 3]>,
@@ -113,6 +91,8 @@ fn request_tile(
     }
 }
 
+/// Builds a Vec of meshes one per tile id required for the chunk
+/// Currently material per tile id as set by uniform, alternative is packing tile info into custom vertex format
 pub fn build_chunk_meshes(chunk: &voxel::Chunk, config: &voxel::VoxelConfig) -> Vec<(u32, Mesh)> {
     // Build map of tiles required with direction and position
     let mut tile_requests : HashMap<u32, Vec<(voxel::Cardinal, (u8, u8, u8))>> = HashMap::new();

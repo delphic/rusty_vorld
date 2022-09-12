@@ -1,5 +1,3 @@
-use std::collections::HashMap;
-
 use bevy::{
     prelude::*,
     reflect::TypeUuid,
@@ -8,7 +6,7 @@ use bevy::{
         texture::ImageSampler
     }
 };
-//use super::mesher;
+use std::collections::HashMap;
 
 #[derive(AsBindGroup, Debug, Clone, TypeUuid)]
 #[uuid = "b93807cc-8804-4849-a524-1ea18c409a3e"]
@@ -43,7 +41,6 @@ pub fn init(app: &mut App) {
 fn setup(
     mut commands: Commands,
     asset_server: Res<AssetServer>,
-    //mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<ArrayTextureMaterial>>,
 ) {
     // TODO: Load twice - set one to nearest, and another to nearest mag, linear min,
@@ -59,15 +56,6 @@ fn setup(
             layer: i as f32,
         });
         atlas_materials.insert(i, material.clone());
-
-        // Technically not part of an atlas loader - but you know we're testing right now
-        // let tile_mesh = meshes.add(mesher::build_tile());
-        // commands.spawn_bundle(MaterialMeshBundle {
-        //     mesh: tile_mesh,
-        //     material: material,
-        //     transform: Transform::from_xyz(i as f32 * 1.5 - 20.0, 1.0, -4.0),
-        //     ..default()
-        // });
     }
 
     commands.insert_resource(AtlasTexture {
@@ -86,7 +74,15 @@ fn handle_atlas_load(
         if let Some(image) = image_assets.get_mut(&atlas.image_handle) {
             atlas.is_loaded = true;
             image.reinterpret_stacked_2d_as_array(atlas.layers);
-            image.sampler_descriptor = ImageSampler::nearest();
+            image.sampler_descriptor = ImageSampler::Descriptor(wgpu::SamplerDescriptor {
+                mag_filter: wgpu::FilterMode::Nearest,
+                min_filter: wgpu::FilterMode::Linear,
+                ..Default::default()
+            });
+            // Combination of mag Nearest and min Linear seems to work but it doesn't seem like ansiotropic filtering is available*
+            // which is what made it not work in WebGL it's likely if we find a way to enable that we'll not be able to use mag Nearest
+            // *presumably because mip-mapping is not available
+
             // NOTE: trying to set sampler in response to EventReader<AssetEvent<Image>> AssetEvent::Created is ineffective
         }
     }

@@ -13,8 +13,8 @@ pub fn spawn_lighting(mut commands: Commands) {
         },
         transform: Transform::from_xyz(0.0, 10.0, 0.0).with_rotation(Quat::from_euler(
             EulerRot::XYZ,
-            -45.0,
-            -20.0,
+            1.02,
+            3.0,
             0.0,
         )),
         ..default()
