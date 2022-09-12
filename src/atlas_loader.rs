@@ -34,7 +34,8 @@ pub struct AtlasTexture {
 pub fn init(app: &mut App) {
     app
         .add_plugin(MaterialPlugin::<ArrayTextureMaterial>::default())
-        .add_startup_system(setup)
+         // Run setup in pre-startup to ensure AtlasTexture resource is available to other startup systems
+        .add_startup_system_to_stage(StartupStage::PreStartup, setup) 
         .add_system(handle_atlas_load);
 }
 
@@ -43,8 +44,6 @@ fn setup(
     asset_server: Res<AssetServer>,
     mut materials: ResMut<Assets<ArrayTextureMaterial>>,
 ) {
-    // TODO: Load twice - set one to nearest, and another to nearest mag, linear min,
-    // Spawn just 1 tile with each and see how they compare at distance
     let atlas_handle = asset_server.load("images/atlas.png");
     let atlas_layers = 23;
 

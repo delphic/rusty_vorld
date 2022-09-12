@@ -18,13 +18,6 @@ pub struct VoxelConfig {
     pub id_to_tile: HashMap<u8, HashMap<Cardinal, u32>>,
 }
 
-// HACK: Atlas Texture Resource not immediately available so running setup as a system
-// based on this struct as resource, should investigate startup stages to deal with this
-// this properly
-pub struct VoxelLoadStage {
-    initialized: bool,
-}
-
 pub const CHUNK_SIZE: usize = 16;
 pub const CHUNK_ARRAY_SIZE: usize = CHUNK_SIZE * CHUNK_SIZE * CHUNK_SIZE;
 
@@ -75,22 +68,15 @@ pub fn init(app: &mut App) {
     );
 
     app.insert_resource(VoxelConfig { id_to_tile: look_up });
-    app.insert_resource(VoxelLoadStage { initialized: false });
-    app.add_system(setup); // TODO: Should be startup system c.f. VoxelLoadStage
+    app.add_startup_system(setup);
 }
 
 pub fn setup(
     mut commands: Commands,
     atlas: Res<AtlasTexture>,
     voxel_config: Res<VoxelConfig>,
-    mut load_stage: ResMut<VoxelLoadStage>,
     mut meshes: ResMut<Assets<Mesh>>,
 ) {
-    if load_stage.initialized {
-        return;
-    }
-
-    load_stage.initialized = true;
     let mut chunk = Chunk {
         voxels: [0; CHUNK_ARRAY_SIZE],
     };
