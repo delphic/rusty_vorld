@@ -5,7 +5,7 @@ use bevy_rapier3d::prelude::*;
 use std::collections::HashMap;
 
 #[derive(Hash, Eq, PartialEq, Copy, Clone, Debug)]
-pub enum Cardinal {
+pub enum Direction {
     Forward = 0,
     Back = 1,
     Up = 2,
@@ -15,7 +15,8 @@ pub enum Cardinal {
 }
 
 pub struct VoxelConfig {
-    pub id_to_tile: HashMap<u8, HashMap<Cardinal, u32>>,
+    // NOTE: direction is from the perspective of the voxel, not the observer (i.e. forward not front or perhaps not "left as I look at it" if front is the forward direction)
+    pub id_to_tile: HashMap<u8, HashMap<Direction, u32>>,
 }
 
 pub const CHUNK_SIZE: usize = 16;
@@ -49,24 +50,24 @@ pub fn init(app: &mut App) {
     look_up.insert(
         BlockIds::Grass as u8,
         HashMap::from([
-            (Cardinal::Forward, 1),
-            (Cardinal::Back, 1),
-            (Cardinal::Up, 0),
-            (Cardinal::Down, 2),
-            (Cardinal::Left, 1),
-            (Cardinal::Right, 1),
+            (Direction::Forward, 1),
+            (Direction::Back, 1),
+            (Direction::Up, 0),
+            (Direction::Down, 2),
+            (Direction::Left, 1),
+            (Direction::Right, 1),
         ])
     );
     // STONE BLOCKS
     look_up.insert(
         BlockIds::StoneBlocks as u8,
         HashMap::from([
-            (Cardinal::Forward, 4),
-            (Cardinal::Back, 4),
-            (Cardinal::Up, 5),
-            (Cardinal::Down, 5),
-            (Cardinal::Left, 4),
-            (Cardinal::Right, 4),
+            (Direction::Forward, 4),
+            (Direction::Back, 4),
+            (Direction::Up, 5),
+            (Direction::Down, 5),
+            (Direction::Left, 4),
+            (Direction::Right, 4),
         ])
     );
 

@@ -1,5 +1,5 @@
 use std::{collections::HashMap, convert::TryInto};
-use super::voxel::{CHUNK_SIZE, Cardinal};
+use super::voxel::{CHUNK_SIZE, Direction};
 use super::voxel;
 use bevy::{
     prelude::*,
@@ -12,7 +12,7 @@ fn insert_tile(
     normals: &mut Vec<[f32; 3]>,
     uvs: &mut Vec<[f32; 2]>,
     indices: &mut Vec<u32>,
-    direction: Cardinal,
+    direction: Direction,
     position: (u8, u8, u8),
 ) {
     let vertices = [
@@ -50,12 +50,12 @@ fn insert_tile(
 
     for _ in 0..4 {
         normals.push(match direction {
-            Cardinal::Forward => [0.0, 0.0, 1.0],
-            Cardinal::Back => [0.0, 0.0, -1.0],
-            Cardinal::Left => [1.0, 0.0, 0.0],
-            Cardinal::Right => [-1.0, 0.0, 0.0],
-            Cardinal::Up => [0.0, 1.0, 0.0],
-            Cardinal::Down => [0.0, -1.0, 0.0],
+            Direction::Forward => [0.0, 0.0, 1.0],
+            Direction::Back => [0.0, 0.0, -1.0],
+            Direction::Left => [1.0, 0.0, 0.0],
+            Direction::Right => [-1.0, 0.0, 0.0],
+            Direction::Up => [0.0, 1.0, 0.0],
+            Direction::Down => [0.0, -1.0, 0.0],
         });
     }
 
@@ -76,9 +76,9 @@ fn insert_tile(
 fn request_tile(
     config: &voxel::VoxelConfig,
     voxel: u8,
-    direction: Cardinal,
+    direction: Direction,
     position: (u8, u8, u8),
-    tile_requests: &mut HashMap<u32, Vec<(Cardinal, (u8, u8, u8))>>,
+    tile_requests: &mut HashMap<u32, Vec<(Direction, (u8, u8, u8))>>,
 ) {
     if let Some(lookup) = config.id_to_tile.get(&voxel) {
         if let Some(tile_id) = lookup.get(&direction) {
@@ -95,7 +95,7 @@ fn request_tile(
 /// Currently material per tile id as set by uniform, alternative is packing tile info into custom vertex format
 pub fn build_chunk_meshes(chunk: &voxel::Chunk, config: &voxel::VoxelConfig) -> Vec<(u32, Mesh)> {
     // Build map of tiles required with direction and position
-    let mut tile_requests : HashMap<u32, Vec<(voxel::Cardinal, (u8, u8, u8))>> = HashMap::new();
+    let mut tile_requests : HashMap<u32, Vec<(voxel::Direction, (u8, u8, u8))>> = HashMap::new();
     for i in 0..chunk.voxels.len() {
         let voxel = chunk.voxels[i]; 
         if voxel != 0 {
@@ -105,22 +105,22 @@ pub fn build_chunk_meshes(chunk: &voxel::Chunk, config: &voxel::VoxelConfig) -> 
             let position = (x, y, z);
 
             if x == 0 || chunk.voxels[i-1] == 0 {
-                request_tile(config, voxel, Cardinal::Right, position, &mut tile_requests);
+                request_tile(config, voxel, Direction::Right, position, &mut tile_requests);
             }
             if y == 0 || chunk.voxels[i - CHUNK_SIZE*CHUNK_SIZE] == 0 {
-                request_tile(config, voxel, Cardinal::Down, position, &mut tile_requests);
+                request_tile(config, voxel, Direction::Down, position, &mut tile_requests);
             }
             if z == 0 || chunk.voxels[i - CHUNK_SIZE] == 0 {
-                request_tile(config, voxel, Cardinal::Back, position, &mut tile_requests);
+                request_tile(config, voxel, Direction::Back, position, &mut tile_requests);
             }
             if x == 15 || chunk.voxels[i+1] == 0 {
-                request_tile(config, voxel, Cardinal::Left, position, &mut tile_requests)
+                request_tile(config, voxel, Direction::Left, position, &mut tile_requests)
             }
             if y == 15 || chunk.voxels[i+ CHUNK_SIZE*CHUNK_SIZE] == 0 {
-                request_tile(config, voxel, Cardinal::Up, position, &mut tile_requests)
+                request_tile(config, voxel, Direction::Up, position, &mut tile_requests)
             }
             if z == 15 || chunk.voxels[i + CHUNK_SIZE] == 0 {
-                request_tile(config, voxel, Cardinal::Forward, position, &mut tile_requests)
+                request_tile(config, voxel, Direction::Forward, position, &mut tile_requests)
             }
         }
     }
