@@ -10,8 +10,8 @@ pub enum Cardinal {
     Back = 1,
     Up = 2,
     Down = 3,
-    Right = 4,
-    Left = 5,
+    Left = 4,
+    Right = 5,
 }
 
 pub struct VoxelConfig {
@@ -53,8 +53,8 @@ pub fn init(app: &mut App) {
             (Cardinal::Back, 1),
             (Cardinal::Up, 0),
             (Cardinal::Down, 2),
-            (Cardinal::Right, 1),
             (Cardinal::Left, 1),
+            (Cardinal::Right, 1),
         ])
     );
     // STONE BLOCKS
@@ -65,8 +65,8 @@ pub fn init(app: &mut App) {
             (Cardinal::Back, 4),
             (Cardinal::Up, 5),
             (Cardinal::Down, 5),
-            (Cardinal::Right, 4),
             (Cardinal::Left, 4),
+            (Cardinal::Right, 4),
         ])
     );
 

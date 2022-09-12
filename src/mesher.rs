@@ -36,12 +36,12 @@ fn insert_tile(
         ([1.0, 0.0, 0.0], [0.0, 0.0]),
         ([1.0, 0.0, 1.0], [0.0, 1.0]),
         ([0.0, 0.0, 1.0], [1.0, 1.0]),
-        // right
+        // left
         ([1.0, 0.0, 0.0], [1.0, 1.0]),
         ([1.0, 1.0, 0.0], [1.0, 0.0]),
         ([1.0, 1.0, 1.0], [0.0, 0.0]),
         ([1.0, 0.0, 1.0], [0.0, 1.0]),
-        // left
+        // right
         ([0.0, 0.0, 0.0], [0.0, 1.0]),
         ([0.0, 0.0, 1.0], [1.0, 1.0]),
         ([0.0, 1.0, 1.0], [1.0, 0.0]),
@@ -52,8 +52,8 @@ fn insert_tile(
         normals.push(match direction {
             Cardinal::Forward => [0.0, 0.0, 1.0],
             Cardinal::Back => [0.0, 0.0, -1.0],
-            Cardinal::Left => [-1.0, 0.0, 0.0],
-            Cardinal::Right => [1.0, 0.0, 0.0],
+            Cardinal::Left => [1.0, 0.0, 0.0],
+            Cardinal::Right => [-1.0, 0.0, 0.0],
             Cardinal::Up => [0.0, 1.0, 0.0],
             Cardinal::Down => [0.0, -1.0, 0.0],
         });
@@ -105,7 +105,7 @@ pub fn build_chunk_meshes(chunk: &voxel::Chunk, config: &voxel::VoxelConfig) -> 
             let position = (x, y, z);
 
             if x == 0 || chunk.voxels[i-1] == 0 {
-                request_tile(config, voxel, Cardinal::Left, position, &mut tile_requests);
+                request_tile(config, voxel, Cardinal::Right, position, &mut tile_requests);
             }
             if y == 0 || chunk.voxels[i - CHUNK_SIZE*CHUNK_SIZE] == 0 {
                 request_tile(config, voxel, Cardinal::Down, position, &mut tile_requests);
@@ -114,7 +114,7 @@ pub fn build_chunk_meshes(chunk: &voxel::Chunk, config: &voxel::VoxelConfig) -> 
                 request_tile(config, voxel, Cardinal::Back, position, &mut tile_requests);
             }
             if x == 15 || chunk.voxels[i+1] == 0 {
-                request_tile(config, voxel, Cardinal::Right, position, &mut tile_requests)
+                request_tile(config, voxel, Cardinal::Left, position, &mut tile_requests)
             }
             if y == 15 || chunk.voxels[i+ CHUNK_SIZE*CHUNK_SIZE] == 0 {
                 request_tile(config, voxel, Cardinal::Up, position, &mut tile_requests)
