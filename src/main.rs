@@ -5,7 +5,7 @@ mod atlas_loader;
 mod input;
 mod mesher;
 mod player_camera;
-mod test_scene_spawner;
+mod scene_spawner;
 mod utils;
 mod voxel;
 
@@ -30,7 +30,7 @@ impl Plugin for VorldPlugin {
         voxel::init(app);
         input::insert_resources(app);
 
-        app.add_startup_system(test_scene_spawner::spawn);
+        app.add_startup_system(scene_spawner::spawn_lighting);
 
         app.add_system(grab_mouse);
         input::add_systems(app);

@@ -21,12 +21,12 @@ pub fn add_systems(app: &mut App) {
 fn setup(mut commands: Commands) {
     commands
         .spawn_bundle(Camera3dBundle {
-            transform: Transform::from_xyz(0.0, 1.75, 16.0),
+            transform: Transform::from_xyz(8.0, 1.75, -8.0),
             ..default()
         })
         .insert(PlayerCamera {
             pitch: 0.0,
-            yaw: 0.0,
+            yaw: std::f32::consts::PI,
         });
 }
 
@@ -36,7 +36,7 @@ fn move_camera(
     rapier_context: Res<RapierContext>,
     mut camera_query: Query<&mut Transform, With<PlayerCamera>>,
 ) {
-    let movement_speed = 5.0;
+    let movement_speed = 5.0; // TODO: degrees = dots * 0.022
     let mut camera_transform = camera_query.iter_mut().last().unwrap();
 
     let local_x = camera_transform.local_x();

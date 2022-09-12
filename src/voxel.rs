@@ -97,13 +97,20 @@ pub fn setup(
     for x in 0..CHUNK_SIZE {
         for z in 0..CHUNK_SIZE {
             chunk.add_voxel(BlockIds::Grass as u8, x, 0, z);
-            if x % 4 == 0 && z % 4 == 0 {
-                for y in 1..CHUNK_SIZE {
+        }
+    }
+
+    for x in 4..=12 {
+        for z in 4..=12 {
+            for y in 1..4 {
+                if (x == 4 || x == 12 || z == 4 || z == 12) && !((x == 8 || x == 9) && z == 4 && y <= 2) {
                     chunk.add_voxel(BlockIds::StoneBlocks as u8, x, y, z);
                 }
             }
+            chunk.add_voxel(BlockIds::StoneBlocks as u8, x, 4, z);
         }
     }
+
     let mut tile_meshes = mesher::build_chunk_meshes(&chunk, &voxel_config);
 
     while let Some((tile_id, mesh)) = tile_meshes.pop() {
@@ -116,7 +123,7 @@ pub fn setup(
         entity_commands.insert_bundle(MaterialMeshBundle {
             mesh: meshes.add(mesh),
             material: atlas.materials[&tile_id].clone(),
-            transform: Transform::from_xyz(-8.0, 0.0, -4.0),
+            transform: Transform::from_xyz(0.0, 0.0, 0.0),
             ..default()
         });
     }

@@ -56,7 +56,7 @@ fn setup(
     for i in 0..atlas_layers {
         let material =  materials.add(ArrayTextureMaterial {
             array_texture: atlas_handle.clone(),
-            layer: i as f32
+            layer: i as f32,
         });
         atlas_materials.insert(i, material.clone());
 

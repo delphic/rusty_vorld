@@ -1,7 +1,28 @@
 use bevy::prelude::*;
 use bevy_rapier3d::prelude::*;
 
-pub fn spawn(
+pub fn spawn_lighting(mut commands: Commands) {
+    commands.insert_resource(AmbientLight::default());
+
+    commands.spawn_bundle(DirectionalLightBundle {
+        directional_light: DirectionalLight {
+            color: Color::rgba_u8(230, 220, 200, 255),
+            illuminance: 10000.0,
+            shadows_enabled: true,
+            ..default()
+        },
+        transform: Transform::from_xyz(0.0, 10.0, 0.0).with_rotation(Quat::from_euler(
+            EulerRot::XYZ,
+            -45.0,
+            -20.0,
+            0.0,
+        )),
+        ..default()
+    });
+}
+
+#[allow(dead_code)]
+pub fn spawn_test(
     mut commands: Commands,
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
@@ -46,23 +67,4 @@ pub fn spawn(
             })
             .insert(Collider::cuboid(0.5, 0.5, 0.5));
     }
-
-    // Lighting
-    commands.insert_resource(AmbientLight::default());
-
-    commands.spawn_bundle(DirectionalLightBundle {
-        directional_light: DirectionalLight {
-            color: Color::rgba_u8(230, 220, 200, 255),
-            illuminance: 10000.0,
-            shadows_enabled: true,
-            ..default()
-        },
-        transform: Transform::from_xyz(0.0, 10.0, 0.0).with_rotation(Quat::from_euler(
-            EulerRot::XYZ,
-            -45.0,
-            -20.0,
-            0.0,
-        )),
-        ..default()
-    });
 }
