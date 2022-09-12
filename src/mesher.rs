@@ -15,6 +15,8 @@ fn insert_tile(
     direction: Direction,
     position: (u8, u8, u8),
 ) {
+    // One could argue that forward should be -z and invert left and right,
+    // as cameras look in the negative z direction and it's more intuative to think of a camera as looking 'forward'.
     let vertices = [
         // forward
         ([0.0, 0.0, 1.0], [0.0, 1.0]),
