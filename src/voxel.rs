@@ -27,8 +27,11 @@ pub struct Chunk {
 
 impl Chunk {
     fn add_voxel(&mut self, id: u8, x: usize, y: usize, z: usize) {
-        // Technically only need 4 bits for chunk size 16
-        self.voxels[x + CHUNK_SIZE * z + CHUNK_SIZE * CHUNK_SIZE * y] = id;
+        if x < CHUNK_SIZE && y < CHUNK_SIZE && z < CHUNK_SIZE {
+            self.voxels[x + CHUNK_SIZE * z + CHUNK_SIZE * CHUNK_SIZE * y] = id;
+        } else {
+            panic!("Received add_voxel instruction outside chunk bounds");
+        }
     }
 }
 
