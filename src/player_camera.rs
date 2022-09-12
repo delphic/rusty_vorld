@@ -56,6 +56,8 @@ fn move_camera(
         let velocity_direction = velocity.normalize();
         let velocity_magnitude = velocity.length();
 
+        let mut collision_disabled = false;
+
         if let Some((_, hit)) = rapier_context.cast_shape(
             camera_transform.translation,
             Quat::IDENTITY,
@@ -64,10 +66,14 @@ fn move_camera(
             time_delta * velocity_magnitude + skin_depth,
             QueryFilter::default(),
         ) {
-            // desired movement collides, attempt to slide along surface
+            
             if hit.toi == 0.0 {
-                panic!("Started camera movement already overlapping");
+                // Already overlapping - should only happen if teleported or spawned inside collider
+                warn!("Started camera movement already overlapping, collision disabled");
+                camera_transform.translation += velocity * time_delta;
+                collision_disabled = true;
             } else {
+                // Desired movement collides, attempt to slide along surface
                 // NOTE: Casting in velocity direction means time of impact is in fact distance to impact
                 let close_distance = hit.toi - skin_depth;
                 camera_transform.translation += velocity_direction * close_distance;
@@ -124,13 +130,16 @@ fn move_camera(
             camera_transform.translation += velocity * time_delta;
         }
 
-        rapier_context.intersections_with_shape(camera_transform.translation, Quat::IDENTITY, &shape, QueryFilter::default(), |_| {
-            // cast_shape sometimes lies about there being no collision due to float precision issues,
-            // so check for intersections and if found restore to starting position
-            warn!("Camera shape found to intersect world collider after movement, restoring to last valid position");
-            camera_transform.translation = start_translation;
-            false
-        });
+        if !collision_disabled {
+            rapier_context.intersections_with_shape(camera_transform.translation, Quat::IDENTITY, &shape, QueryFilter::default(), |_| {
+                // cast_shape sometimes lies about there being no collision due to float precision issues,
+                // so check for intersections and if found restore to starting position
+                warn!("Camera shape found to intersect world collider after movement, restoring to last valid position");
+                camera_transform.translation = start_translation;
+                false
+            });
+        }
+
     }
 }
 
