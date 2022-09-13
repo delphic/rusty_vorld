@@ -95,7 +95,7 @@ fn request_tile(
 
 /// Builds a Vec of meshes one per tile id required for the chunk
 /// Currently material per tile id as set by uniform, alternative is packing tile info into custom vertex format
-pub fn build_chunk_meshes(chunk: &voxel::Chunk, config: &voxel::VoxelConfig) -> Vec<(u32, Mesh)> {
+pub fn build_chunk_meshes(chunk: &voxel::Chunk, world: &voxel::Vorld, config: &voxel::VoxelConfig) -> Vec<(u32, Mesh)> {
     // Build map of tiles required with direction and position
     let mut tile_requests : HashMap<u32, Vec<(voxel::Direction, (u8, u8, u8))>> = HashMap::new();
     for i in 0..chunk.voxels.len() {
@@ -106,22 +106,28 @@ pub fn build_chunk_meshes(chunk: &voxel::Chunk, config: &voxel::VoxelConfig) -> 
             let z = ((i / CHUNK_SIZE) % voxel::CHUNK_SIZE).try_into().unwrap();
             let position = (x, y, z);
 
-            if x == 0 || chunk.voxels[i-1] == 0 {
+            let world_x = chunk.indices.x * voxel::CHUNK_SIZE_I32 + x as i32;
+            let world_y = chunk.indices.y * voxel::CHUNK_SIZE_I32 + y as i32;
+            let world_z = chunk.indices.z * voxel::CHUNK_SIZE_I32 + z as i32;
+
+            // Could optimise by having a get_voxel_by_index and manually passing the chunk indices rather than having
+            // to calculate world coordinates and then convert back to indices
+            if (x == 0 && world.get_voxel(world_x - 1, world_y, world_z) == 0) || (x != 0 && chunk.voxels[i-1] == 0 ){
                 request_tile(config, voxel, Direction::Right, position, &mut tile_requests);
             }
-            if y == 0 || chunk.voxels[i - CHUNK_SIZE*CHUNK_SIZE] == 0 {
+            if (y == 0 && world.get_voxel(world_x, world_y - 1, world_z) == 0) || (y != 0 && chunk.voxels[i - CHUNK_SIZE*CHUNK_SIZE] == 0) {
                 request_tile(config, voxel, Direction::Down, position, &mut tile_requests);
             }
-            if z == 0 || chunk.voxels[i - CHUNK_SIZE] == 0 {
+            if (z == 0 && world.get_voxel(world_x, world_y, world_z - 1) == 0) || (z != 0 && chunk.voxels[i - CHUNK_SIZE] == 0) {
                 request_tile(config, voxel, Direction::Back, position, &mut tile_requests);
             }
-            if x == 15 || chunk.voxels[i+1] == 0 {
+            if (x == 15 && world.get_voxel(world_x + 1, world_y, world_z) == 0) || (x != 15 && chunk.voxels[i+1] == 0) {
                 request_tile(config, voxel, Direction::Left, position, &mut tile_requests)
             }
-            if y == 15 || chunk.voxels[i+ CHUNK_SIZE*CHUNK_SIZE] == 0 {
+            if (y == 15 && world.get_voxel(world_x, world_y + 1, world_z) == 0) || (y != 15 && chunk.voxels[i+ CHUNK_SIZE*CHUNK_SIZE] == 0) {
                 request_tile(config, voxel, Direction::Up, position, &mut tile_requests)
             }
-            if z == 15 || chunk.voxels[i + CHUNK_SIZE] == 0 {
+            if (z == 15 && world.get_voxel(world_x, world_y, world_z + 1) == 0) || (z != 15 && chunk.voxels[i + CHUNK_SIZE] == 0) {
                 request_tile(config, voxel, Direction::Forward, position, &mut tile_requests)
             }
         }

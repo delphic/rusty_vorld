@@ -43,22 +43,34 @@ impl Vorld {
         IVec3::new(Self::get_chunk_index(x), Self::get_chunk_index(y), Self::get_chunk_index(z))
     }
 
-    fn add_voxel(&mut self, id: u8, x: i32, y: i32, z: i32) {
+    fn get_block_indices(chunk_key: IVec3, x: i32, y: i32, z: i32) -> (usize, usize, usize) {
+        (
+            (x - chunk_key.x * CHUNK_SIZE_I32).try_into().unwrap(),
+            (y - chunk_key.y * CHUNK_SIZE_I32).try_into().unwrap(),
+            (z - chunk_key.z * CHUNK_SIZE_I32).try_into().unwrap()
+        )
+    }
+
+    pub fn add_voxel(&mut self, id: u8, x: i32, y: i32, z: i32) {
         let key = Self::get_chunk_key(x, y, z);
         if let Some(chunk) = self.chunks.get_mut(&key) {
-
-            let i = (x - key.x * CHUNK_SIZE_I32).try_into().unwrap();
-            let j = (y - key.y * CHUNK_SIZE_I32).try_into().unwrap();
-            let k = (z - key.z * CHUNK_SIZE_I32).try_into().unwrap();
-            chunk.add_voxel(id, i, j, k);
+            let block_indicies = Self::get_block_indices(key, x, y, z);
+            chunk.add_voxel(id, block_indicies.0, block_indicies.1, block_indicies.2);
         } else {
-            let mut chunk = Chunk { voxels: [ BlockIds::Air as u8; CHUNK_ARRAY_SIZE ]};
-
-            let i = (x - key.x * CHUNK_SIZE_I32).try_into().unwrap();
-            let j = (y - key.y * CHUNK_SIZE_I32).try_into().unwrap();
-            let k = (z - key.z * CHUNK_SIZE_I32).try_into().unwrap();
-            chunk.add_voxel(id, i, j, k);
+            let mut chunk = Chunk { indices: key, voxels: [ BlockIds::Air as u8; CHUNK_ARRAY_SIZE ]};
+            let block_indicies = Self::get_block_indices(key, x, y, z);
+            chunk.add_voxel(id, block_indicies.0, block_indicies.1, block_indicies.2);
             self.chunks.insert(key, chunk);
+        }
+    }
+
+    pub fn get_voxel(&self, x: i32, y: i32, z: i32) -> u8 {
+        let key = Self::get_chunk_key(x, y, z);
+        if let Some(chunk) = self.chunks.get(&key) {
+            let block_indicies = Self::get_block_indices(key, x, y, z);
+            chunk.get_voxel(block_indicies.0, block_indicies.1, block_indicies.2)
+        } else {
+            BlockIds::Air as u8
         }
     }
 }
@@ -80,6 +92,7 @@ fn point_in_chunk(v: i32) -> i32 {
 }
 
 pub struct Chunk {
+    pub indices: IVec3,
     pub voxels: [u8; CHUNK_ARRAY_SIZE],
 }
 
@@ -89,6 +102,13 @@ impl Chunk {
             self.voxels[x + CHUNK_SIZE * z + CHUNK_SIZE * CHUNK_SIZE * y] = id;
         } else {
             panic!("Received add_voxel instruction outside chunk bounds");
+        }
+    }
+    fn get_voxel(&self, x: usize, y: usize, z: usize) -> u8 {
+        if x < CHUNK_SIZE && y < CHUNK_SIZE && z < CHUNK_SIZE {
+            self.voxels[x + CHUNK_SIZE * z + CHUNK_SIZE * CHUNK_SIZE * y]
+        } else {
+            panic!("Received get_voxel request outside chunk bounds");
         }
     }
 }
@@ -163,7 +183,7 @@ pub fn setup(
     }
 
     for (key, chunk) in vorld.chunks.iter() {
-        let mut tile_meshes = mesher::build_chunk_meshes(&chunk, &voxel_config);
+        let mut tile_meshes = mesher::build_chunk_meshes(&chunk, &vorld, &voxel_config);
 
         while let Some((tile_id, mesh)) = tile_meshes.pop() {
             let mut entity_commands = commands.spawn();
