@@ -13,7 +13,7 @@ fn insert_tile(
     uvs: &mut Vec<[f32; 2]>,
     indices: &mut Vec<u32>,
     direction: Direction,
-    position: (u8, u8, u8),
+    position: (usize, usize, usize),
 ) {
     // One could argue that forward should be -z and invert left and right,
     // as cameras look in the negative z direction and it's more intuative to think of a camera as looking 'forward'.
@@ -76,59 +76,59 @@ fn insert_tile(
 }
 
 fn request_tile(
-    config: &voxel::VoxelConfig,
+    look_up: &[[u32; 6]; 256],
     voxel: u8,
     direction: Direction,
-    position: (u8, u8, u8),
-    tile_requests: &mut HashMap<u32, Vec<(Direction, (u8, u8, u8))>>,
+    position: (usize, usize, usize),
+    tile_requests: &mut HashMap<u32, Vec<(Direction, (usize, usize, usize))>>,
 ) {
-    if let Some(lookup) = config.id_to_tile.get(&voxel) {
-        if let Some(tile_id) = lookup.get(&direction) {
-            if let Some(positions) = tile_requests.get_mut(tile_id) {
-                positions.push((direction, position));
-            } else {
-                tile_requests.insert(*tile_id, Vec::from([(direction, position)]));
-            }
-        }
+    let tile_id = look_up[voxel as usize][direction as usize];
+    if let Some(positions) = tile_requests.get_mut(&tile_id) {
+        positions.push((direction, position));
+    } else {
+        tile_requests.insert(tile_id, Vec::from([(direction, position)]));
     }
 }
 
 /// Builds a Vec of meshes one per tile id required for the chunk
 /// Currently material per tile id as set by uniform, alternative is packing tile info into custom vertex format
-pub fn build_chunk_meshes(chunk: &voxel::Chunk, world: &voxel::Vorld, config: &voxel::VoxelConfig) -> Vec<(u32, Mesh)> {
+pub fn build_chunk_meshes(chunk_slice: voxel::VorldSlice, look_up: [[u32; 6]; 256]) -> Vec<(u32, Mesh)> {
     // Build map of tiles required with direction and position
-    let mut tile_requests : HashMap<u32, Vec<(voxel::Direction, (u8, u8, u8))>> = HashMap::new();
+    let mut tile_requests : HashMap<u32, Vec<(voxel::Direction, (usize, usize, usize))>> = HashMap::new();
+    let chunk = chunk_slice.chunk;
     for i in 0..chunk.voxels.len() {
         let voxel = chunk.voxels[i]; 
         if voxel != 0 {
-            let x = (i % voxel::CHUNK_SIZE).try_into().unwrap();
-            let y = (i / (CHUNK_SIZE * CHUNK_SIZE)).try_into().unwrap();
-            let z = ((i / CHUNK_SIZE) % voxel::CHUNK_SIZE).try_into().unwrap();
+            let x = i % voxel::CHUNK_SIZE;
+            let y = i / (CHUNK_SIZE * CHUNK_SIZE);
+            let z = (i / CHUNK_SIZE) % voxel::CHUNK_SIZE;
+
+            // TODO: Just take usize position - it's not like u8 can't overflow the bounds
             let position = (x, y, z);
 
-            let world_x = chunk.indices.x * voxel::CHUNK_SIZE_I32 + x as i32;
-            let world_y = chunk.indices.y * voxel::CHUNK_SIZE_I32 + y as i32;
-            let world_z = chunk.indices.z * voxel::CHUNK_SIZE_I32 + z as i32;
-
-            // Could optimise by having a get_voxel_by_index and manually passing the chunk indices rather than having
-            // to calculate world coordinates and then convert back to indices
-            if (x == 0 && world.get_voxel(world_x - 1, world_y, world_z) == 0) || (x != 0 && chunk.voxels[i-1] == 0 ){
-                request_tile(config, voxel, Direction::Right, position, &mut tile_requests);
+            if (x == 0 && (chunk_slice.right_chunk.is_none() || chunk_slice.right_chunk.unwrap().get_voxel(CHUNK_SIZE - 1, y, z) == 0))
+            || (x != 0 && chunk.voxels[i-1] == 0) {
+                request_tile(&look_up, voxel, Direction::Right, position, &mut tile_requests);
             }
-            if (y == 0 && world.get_voxel(world_x, world_y - 1, world_z) == 0) || (y != 0 && chunk.voxels[i - CHUNK_SIZE*CHUNK_SIZE] == 0) {
-                request_tile(config, voxel, Direction::Down, position, &mut tile_requests);
+            if (y == 0 && (chunk_slice.down_chunk.is_none() || chunk_slice.down_chunk.unwrap().get_voxel(x, CHUNK_SIZE - 1, z) == 0))
+            || (y != 0 && chunk.voxels[i - CHUNK_SIZE * CHUNK_SIZE] == 0) {
+                request_tile(&look_up, voxel, Direction::Down, position, &mut tile_requests);
             }
-            if (z == 0 && world.get_voxel(world_x, world_y, world_z - 1) == 0) || (z != 0 && chunk.voxels[i - CHUNK_SIZE] == 0) {
-                request_tile(config, voxel, Direction::Back, position, &mut tile_requests);
+            if (z == 0 && (chunk_slice.back_chunk.is_none() || chunk_slice.back_chunk.unwrap().get_voxel(x, y, CHUNK_SIZE - 1) == 0))
+            || (z != 0 && chunk.voxels[i - CHUNK_SIZE] == 0) {
+                request_tile(&look_up, voxel, Direction::Back, position, &mut tile_requests);
             }
-            if (x == 15 && world.get_voxel(world_x + 1, world_y, world_z) == 0) || (x != 15 && chunk.voxels[i+1] == 0) {
-                request_tile(config, voxel, Direction::Left, position, &mut tile_requests)
+            if (x == 15 && (chunk_slice.left_chunk.is_none() || chunk_slice.left_chunk.unwrap().get_voxel(0, y, z) == 0))
+            || (x != 15 && chunk.voxels[i+1] == 0) {
+                request_tile(&look_up, voxel, Direction::Left, position, &mut tile_requests)
             }
-            if (y == 15 && world.get_voxel(world_x, world_y + 1, world_z) == 0) || (y != 15 && chunk.voxels[i+ CHUNK_SIZE*CHUNK_SIZE] == 0) {
-                request_tile(config, voxel, Direction::Up, position, &mut tile_requests)
+            if (y == 15 && (chunk_slice.up_chunk.is_none() || chunk_slice.up_chunk.unwrap().get_voxel(x, 0, z) == 0))
+            || (y != 15 && chunk.voxels[i+ CHUNK_SIZE*CHUNK_SIZE] == 0) {
+                request_tile(&look_up, voxel, Direction::Up, position, &mut tile_requests)
             }
-            if (z == 15 && world.get_voxel(world_x, world_y, world_z + 1) == 0) || (z != 15 && chunk.voxels[i + CHUNK_SIZE] == 0) {
-                request_tile(config, voxel, Direction::Forward, position, &mut tile_requests)
+            if (z == 15 && (chunk_slice.forward_chunk.is_none() || chunk_slice.forward_chunk.unwrap().get_voxel(x, y, 0) == 0))
+            || (z != 15 && chunk.voxels[i + CHUNK_SIZE] == 0) {
+                request_tile(&look_up, voxel, Direction::Forward, position, &mut tile_requests)
             }
         }
     }

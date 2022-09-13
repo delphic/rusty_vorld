@@ -1,9 +1,11 @@
 use super::atlas_loader::AtlasTexture;
 use super::mesher;
 use bevy::prelude::*;
+use bevy::tasks::{Task, AsyncComputeTaskPool};
 use bevy_rapier3d::prelude::*;
 use std::collections::HashMap;
 use std::convert::TryInto;
+use futures_lite::future;
 
 #[derive(Hash, Eq, PartialEq, Copy, Clone, Debug)]
 pub enum Direction {
@@ -16,8 +18,9 @@ pub enum Direction {
 }
 
 pub struct VoxelConfig {
-    // NOTE: direction is from the perspective of the voxel, not the observer (i.e. forward not front or perhaps not "left as I look at it" if front is the forward direction)
-    pub id_to_tile: HashMap<u8, HashMap<Direction, u32>>,
+    /// indexed on voxel id (0-255) and then direction (0-5) returns tile id (u32)
+    /// NOTE: direction is from the perspective of the voxel, not the observer (i.e. forward not front or perhaps not "left as I look at it" if front is the forward direction)
+    pub id_to_tile: [[u32; 6]; 256]
 }
 
 pub const CHUNK_SIZE: usize = 16;
@@ -25,6 +28,7 @@ pub const CHUNK_SIZE_I32: i32 = 16;
 pub const CHUNK_SIZE_F32: f32 = 16.0;
 pub const CHUNK_ARRAY_SIZE: usize = CHUNK_SIZE * CHUNK_SIZE * CHUNK_SIZE;
 
+#[derive(Clone, Debug)]
 pub struct Vorld {
     pub chunks: HashMap<IVec3, Chunk>,
 }
@@ -64,6 +68,7 @@ impl Vorld {
         }
     }
 
+    #[allow(dead_code)]
     pub fn get_voxel(&self, x: i32, y: i32, z: i32) -> u8 {
         let key = Self::get_chunk_key(x, y, z);
         if let Some(chunk) = self.chunks.get(&key) {
@@ -73,12 +78,21 @@ impl Vorld {
             BlockIds::Air as u8
         }
     }
-}
 
-#[test]
-fn test_key() {
-    assert_eq!(Vorld::get_chunk_index(-15), -1);
-    assert_eq!(Vorld::get_chunk_index(-16), -1);
+    pub fn get_slice_for_chunk(&self, chunk_key: &IVec3) -> Option<VorldSlice> {
+        if let Some(chunk) = self.chunks.get(&chunk_key) {
+            return Some(VorldSlice {
+                chunk: *chunk,
+                up_chunk: self.chunks.get(&IVec3::new(chunk_key.x, chunk_key.y + 1, chunk_key.z)).copied(),
+                down_chunk: self.chunks.get(&IVec3::new(chunk_key.x, chunk_key.y - 1, chunk_key.z)).copied(),
+                left_chunk: self.chunks.get(&IVec3::new(chunk_key.x + 1, chunk_key.y, chunk_key.z)).copied(),
+                right_chunk: self.chunks.get(&IVec3::new(chunk_key.x - 1, chunk_key.y, chunk_key.z)).copied(),
+                forward_chunk: self.chunks.get(&IVec3::new(chunk_key.x, chunk_key.y, chunk_key.z + 1)).copied(),
+                back_chunk: self.chunks.get(&IVec3::new(chunk_key.x, chunk_key.y, chunk_key.z - 1)).copied(),
+            });
+        }
+        None
+    }
 }
 
 fn point_in_chunk(v: i32) -> i32 {
@@ -91,20 +105,32 @@ fn point_in_chunk(v: i32) -> i32 {
     }
 }
 
+#[derive(Copy, Clone, Debug)]
+pub struct VorldSlice {
+    pub chunk: Chunk,
+    pub up_chunk: Option<Chunk>,
+    pub down_chunk: Option<Chunk>,
+    pub left_chunk: Option<Chunk>,
+    pub right_chunk: Option<Chunk>,
+    pub forward_chunk: Option<Chunk>,
+    pub back_chunk: Option<Chunk>,
+}
+
+#[derive(Copy, Clone, Debug)]
 pub struct Chunk {
     pub indices: IVec3,
     pub voxels: [u8; CHUNK_ARRAY_SIZE],
 }
 
 impl Chunk {
-    fn add_voxel(&mut self, id: u8, x: usize, y: usize, z: usize) {
+    pub fn add_voxel(&mut self, id: u8, x: usize, y: usize, z: usize) {
         if x < CHUNK_SIZE && y < CHUNK_SIZE && z < CHUNK_SIZE {
             self.voxels[x + CHUNK_SIZE * z + CHUNK_SIZE * CHUNK_SIZE * y] = id;
         } else {
             panic!("Received add_voxel instruction outside chunk bounds");
         }
     }
-    fn get_voxel(&self, x: usize, y: usize, z: usize) -> u8 {
+    pub fn get_voxel(&self, x: usize, y: usize, z: usize) -> u8 {
         if x < CHUNK_SIZE && y < CHUNK_SIZE && z < CHUNK_SIZE {
             self.voxels[x + CHUNK_SIZE * z + CHUNK_SIZE * CHUNK_SIZE * y]
         } else {
@@ -122,42 +148,22 @@ enum BlockIds {
 }
 
 pub fn init(app: &mut App) {
-    let mut look_up = HashMap::new();
-    // GRASS
-    look_up.insert(
-        BlockIds::Grass as u8,
-        HashMap::from([
-            (Direction::Forward, 1),
-            (Direction::Back, 1),
-            (Direction::Up, 0),
-            (Direction::Down, 2),
-            (Direction::Left, 1),
-            (Direction::Right, 1),
-        ])
-    );
-    // STONE BLOCKS
-    look_up.insert(
-        BlockIds::StoneBlocks as u8,
-        HashMap::from([
-            (Direction::Forward, 4),
-            (Direction::Back, 4),
-            (Direction::Up, 5),
-            (Direction::Down, 5),
-            (Direction::Left, 4),
-            (Direction::Right, 4),
-        ])
-    );
-
-    app.insert_resource(VoxelConfig { id_to_tile: look_up });
+    let mut look_up = [[0; 6]; 256];
+    look_up[BlockIds::Grass as usize] = [ 1, 1, 0, 2, 1, 1 ];
+    look_up[BlockIds::StoneBlocks as usize] = [ 4, 4, 5, 5, 4, 4 ];
+    app.insert_resource(VoxelConfig { id_to_tile: look_up});
     app.add_startup_system(setup);
+    app.add_system(handle_meshing_tasks);
 }
+
+#[derive(Component)]
+struct ComputeChunkMeshes(Task<(IVec3, Vec<(u32, Mesh)>)>);
 
 pub fn setup(
     mut commands: Commands,
-    atlas: Res<AtlasTexture>,
     voxel_config: Res<VoxelConfig>,
-    mut meshes: ResMut<Assets<Mesh>>,
 ) {
+    // Generate World
     let mut vorld = Vorld {
         chunks: HashMap::new(),
     };
@@ -182,22 +188,48 @@ pub fn setup(
         }
     }
 
-    for (key, chunk) in vorld.chunks.iter() {
-        let mut tile_meshes = mesher::build_chunk_meshes(&chunk, &vorld, &voxel_config);
+    let mut chunk_slices = Vec::<VorldSlice>::new();
+    for (key, _) in vorld.chunks.iter() {
+        if let Some(slice) = vorld.get_slice_for_chunk(key) {
+            chunk_slices.push(slice);
+        }
+    }
 
-        while let Some((tile_id, mesh)) = tile_meshes.pop() {
-            let mut entity_commands = commands.spawn();
-            if let Some(collider) = Collider::from_bevy_mesh(&mesh, &ComputedColliderShape::TriMesh) {
-                entity_commands.insert(collider);
-            } else {
-                error!("Unable to generate mesh collider");
+    let thread_pool = AsyncComputeTaskPool::get();
+    let look_up = voxel_config.id_to_tile;
+
+    while let Some(slice) = chunk_slices.pop() {
+        let task = thread_pool.spawn(async move {
+            (slice.chunk.indices, mesher::build_chunk_meshes(slice, look_up))
+        });
+        commands.spawn().insert(ComputeChunkMeshes(task));
+
+    }
+}
+
+fn handle_meshing_tasks(
+    mut commands: Commands,
+    mut meshing_tasks: Query<(Entity, &mut ComputeChunkMeshes)>,
+    atlas: Res<AtlasTexture>,
+    mut meshes: ResMut<Assets<Mesh>>,
+) {
+    for (entity, mut task) in meshing_tasks.iter_mut() {
+        if let Some((key, mut tile_meshes)) = future::block_on(future::poll_once(&mut task.0)) {
+            while let Some((tile_id, mesh)) = tile_meshes.pop() {
+                let mut entity_commands = commands.spawn();
+                if let Some(collider) = Collider::from_bevy_mesh(&mesh, &ComputedColliderShape::TriMesh) {
+                    entity_commands.insert(collider);
+                } else {
+                    error!("Unable to generate mesh collider");
+                }
+                entity_commands.insert_bundle(MaterialMeshBundle {
+                    mesh: meshes.add(mesh),
+                    material: atlas.materials[&tile_id].clone(),
+                    transform: Transform::from_xyz(key.x as f32 * CHUNK_SIZE_F32, key.y as f32 * CHUNK_SIZE_F32, key.z as f32 * CHUNK_SIZE_F32),
+                    ..default()
+                });
             }
-            entity_commands.insert_bundle(MaterialMeshBundle {
-                mesh: meshes.add(mesh),
-                material: atlas.materials[&tile_id].clone(),
-                transform: Transform::from_xyz(key.x as f32 * CHUNK_SIZE_F32, key.y as f32 * CHUNK_SIZE_F32, key.z as f32 * CHUNK_SIZE_F32),
-                ..default()
-            });
+            commands.entity(entity).remove::<ComputeChunkMeshes>();
         }
     }
 }
