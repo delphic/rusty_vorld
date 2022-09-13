@@ -103,7 +103,6 @@ pub fn build_chunk_meshes(chunk_slice: voxel::VorldSlice, look_up: [[u32; 6]; 25
             let y = i / (CHUNK_SIZE * CHUNK_SIZE);
             let z = (i / CHUNK_SIZE) % voxel::CHUNK_SIZE;
 
-            // TODO: Just take usize position - it's not like u8 can't overflow the bounds
             let position = (x, y, z);
 
             if (x == 0 && (chunk_slice.right_chunk.is_none() || chunk_slice.right_chunk.unwrap().get_voxel(CHUNK_SIZE - 1, y, z) == 0))
