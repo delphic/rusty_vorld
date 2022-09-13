@@ -66,7 +66,6 @@ fn move_camera(
             time_delta * velocity_magnitude + skin_depth,
             QueryFilter::default(),
         ) {
-            
             if hit.toi == 0.0 {
                 // Already overlapping - should only happen if teleported or spawned inside collider
                 warn!("Started camera movement already overlapping, collision disabled");
@@ -139,7 +138,6 @@ fn move_camera(
                 false
             });
         }
-
     }
 }
 

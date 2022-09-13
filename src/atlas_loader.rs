@@ -1,10 +1,10 @@
 use bevy::{
     prelude::*,
     reflect::TypeUuid,
-    render::{ 
+    render::{
         render_resource::{AsBindGroup, ShaderRef},
-        texture::ImageSampler
-    }
+        texture::ImageSampler,
+    },
 };
 use std::collections::HashMap;
 
@@ -20,7 +20,7 @@ pub struct ArrayTextureMaterial {
 
 impl Material for ArrayTextureMaterial {
     fn fragment_shader() -> ShaderRef {
-         "shaders/voxel.wgsl".into()
+        "shaders/voxel.wgsl".into()
     }
 }
 
@@ -32,10 +32,9 @@ pub struct AtlasTexture {
 }
 
 pub fn init(app: &mut App) {
-    app
-        .add_plugin(MaterialPlugin::<ArrayTextureMaterial>::default())
-         // Run setup in pre-startup to ensure AtlasTexture resource is available to other startup systems
-        .add_startup_system_to_stage(StartupStage::PreStartup, setup) 
+    app.add_plugin(MaterialPlugin::<ArrayTextureMaterial>::default())
+        // Run setup in pre-startup to ensure AtlasTexture resource is available to other startup systems
+        .add_startup_system_to_stage(StartupStage::PreStartup, setup)
         .add_system(handle_atlas_load);
 }
 
@@ -47,10 +46,10 @@ fn setup(
     let atlas_handle = asset_server.load("images/atlas.png");
     let atlas_layers = 23;
 
-    let mut atlas_materials = HashMap::new(); 
+    let mut atlas_materials = HashMap::new();
 
     for i in 0..atlas_layers {
-        let material =  materials.add(ArrayTextureMaterial {
+        let material = materials.add(ArrayTextureMaterial {
             array_texture: atlas_handle.clone(),
             layer: i as f32,
         });
@@ -65,10 +64,7 @@ fn setup(
     });
 }
 
-fn handle_atlas_load(
-    mut image_assets: ResMut<Assets<Image>>,
-    mut atlas: ResMut<AtlasTexture>
-) {
+fn handle_atlas_load(mut image_assets: ResMut<Assets<Image>>, mut atlas: ResMut<AtlasTexture>) {
     if !atlas.is_loaded {
         if let Some(image) = image_assets.get_mut(&atlas.image_handle) {
             atlas.is_loaded = true;
@@ -86,6 +82,3 @@ fn handle_atlas_load(
         }
     }
 }
-
-
-

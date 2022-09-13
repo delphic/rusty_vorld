@@ -1,11 +1,11 @@
-use std::{collections::HashMap, convert::TryInto};
-use super::voxel::{CHUNK_SIZE, Direction};
 use super::voxel;
+use super::voxel::{Direction, CHUNK_SIZE};
 use bevy::{
     prelude::*,
     render::mesh::Indices,
     render::{mesh::Mesh, render_resource::PrimitiveTopology},
 };
+use std::{collections::HashMap, convert::TryInto};
 
 fn insert_tile(
     positions: &mut Vec<[f32; 3]>,
@@ -61,7 +61,7 @@ fn insert_tile(
         });
     }
 
-    let n : u32 = positions.len().try_into().unwrap();
+    let n: u32 = positions.len().try_into().unwrap();
     let position_offset = Vec3::new(position.0 as f32, position.1 as f32, position.2 as f32);
     let index_offset = direction as usize * 4;
     for i in 0..4 {
@@ -69,7 +69,7 @@ fn insert_tile(
         uvs.push(vertices[i + index_offset].1);
     }
 
-    let quad_indices : Vec<u32> = vec![0, 1, 2, 0, 2, 3];
+    let quad_indices: Vec<u32> = vec![0, 1, 2, 0, 2, 3];
     for i in quad_indices {
         indices.push(n + i);
     }
@@ -92,12 +92,16 @@ fn request_tile(
 
 /// Builds a Vec of meshes one per tile id required for the chunk
 /// Currently material per tile id as set by uniform, alternative is packing tile info into custom vertex format
-pub fn build_chunk_meshes(chunk_slice: voxel::VorldSlice, look_up: [[u32; 6]; 256]) -> Vec<(u32, Mesh)> {
+pub fn build_chunk_meshes(
+    chunk_slice: voxel::VorldSlice,
+    look_up: [[u32; 6]; 256],
+) -> Vec<(u32, Mesh)> {
     // Build map of tiles required with direction and position
-    let mut tile_requests : HashMap<u32, Vec<(voxel::Direction, (usize, usize, usize))>> = HashMap::new();
+    let mut tile_requests: HashMap<u32, Vec<(voxel::Direction, (usize, usize, usize))>> =
+        HashMap::new();
     let chunk = chunk_slice.chunk;
     for i in 0..chunk.voxels.len() {
-        let voxel = chunk.voxels[i]; 
+        let voxel = chunk.voxels[i];
         if voxel != 0 {
             let x = i % voxel::CHUNK_SIZE;
             let y = i / (CHUNK_SIZE * CHUNK_SIZE);
@@ -105,44 +109,111 @@ pub fn build_chunk_meshes(chunk_slice: voxel::VorldSlice, look_up: [[u32; 6]; 25
 
             let position = (x, y, z);
 
-            if (x == 0 && (chunk_slice.right_chunk.is_none() || chunk_slice.right_chunk.unwrap().get_voxel(CHUNK_SIZE - 1, y, z) == 0))
-            || (x != 0 && chunk.voxels[i-1] == 0) {
-                request_tile(&look_up, voxel, Direction::Right, position, &mut tile_requests);
+            if (x == 0
+                && (chunk_slice.right_chunk.is_none()
+                    || chunk_slice
+                        .right_chunk
+                        .unwrap()
+                        .get_voxel(CHUNK_SIZE - 1, y, z)
+                        == 0))
+                || (x != 0 && chunk.voxels[i - 1] == 0)
+            {
+                request_tile(
+                    &look_up,
+                    voxel,
+                    Direction::Right,
+                    position,
+                    &mut tile_requests,
+                );
             }
-            if (y == 0 && (chunk_slice.down_chunk.is_none() || chunk_slice.down_chunk.unwrap().get_voxel(x, CHUNK_SIZE - 1, z) == 0))
-            || (y != 0 && chunk.voxels[i - CHUNK_SIZE * CHUNK_SIZE] == 0) {
-                request_tile(&look_up, voxel, Direction::Down, position, &mut tile_requests);
+            if (y == 0
+                && (chunk_slice.down_chunk.is_none()
+                    || chunk_slice
+                        .down_chunk
+                        .unwrap()
+                        .get_voxel(x, CHUNK_SIZE - 1, z)
+                        == 0))
+                || (y != 0 && chunk.voxels[i - CHUNK_SIZE * CHUNK_SIZE] == 0)
+            {
+                request_tile(
+                    &look_up,
+                    voxel,
+                    Direction::Down,
+                    position,
+                    &mut tile_requests,
+                );
             }
-            if (z == 0 && (chunk_slice.back_chunk.is_none() || chunk_slice.back_chunk.unwrap().get_voxel(x, y, CHUNK_SIZE - 1) == 0))
-            || (z != 0 && chunk.voxels[i - CHUNK_SIZE] == 0) {
-                request_tile(&look_up, voxel, Direction::Back, position, &mut tile_requests);
+            if (z == 0
+                && (chunk_slice.back_chunk.is_none()
+                    || chunk_slice
+                        .back_chunk
+                        .unwrap()
+                        .get_voxel(x, y, CHUNK_SIZE - 1)
+                        == 0))
+                || (z != 0 && chunk.voxels[i - CHUNK_SIZE] == 0)
+            {
+                request_tile(
+                    &look_up,
+                    voxel,
+                    Direction::Back,
+                    position,
+                    &mut tile_requests,
+                );
             }
-            if (x == 15 && (chunk_slice.left_chunk.is_none() || chunk_slice.left_chunk.unwrap().get_voxel(0, y, z) == 0))
-            || (x != 15 && chunk.voxels[i+1] == 0) {
-                request_tile(&look_up, voxel, Direction::Left, position, &mut tile_requests)
+            if (x == 15
+                && (chunk_slice.left_chunk.is_none()
+                    || chunk_slice.left_chunk.unwrap().get_voxel(0, y, z) == 0))
+                || (x != 15 && chunk.voxels[i + 1] == 0)
+            {
+                request_tile(
+                    &look_up,
+                    voxel,
+                    Direction::Left,
+                    position,
+                    &mut tile_requests,
+                )
             }
-            if (y == 15 && (chunk_slice.up_chunk.is_none() || chunk_slice.up_chunk.unwrap().get_voxel(x, 0, z) == 0))
-            || (y != 15 && chunk.voxels[i+ CHUNK_SIZE*CHUNK_SIZE] == 0) {
+            if (y == 15
+                && (chunk_slice.up_chunk.is_none()
+                    || chunk_slice.up_chunk.unwrap().get_voxel(x, 0, z) == 0))
+                || (y != 15 && chunk.voxels[i + CHUNK_SIZE * CHUNK_SIZE] == 0)
+            {
                 request_tile(&look_up, voxel, Direction::Up, position, &mut tile_requests)
             }
-            if (z == 15 && (chunk_slice.forward_chunk.is_none() || chunk_slice.forward_chunk.unwrap().get_voxel(x, y, 0) == 0))
-            || (z != 15 && chunk.voxels[i + CHUNK_SIZE] == 0) {
-                request_tile(&look_up, voxel, Direction::Forward, position, &mut tile_requests)
+            if (z == 15
+                && (chunk_slice.forward_chunk.is_none()
+                    || chunk_slice.forward_chunk.unwrap().get_voxel(x, y, 0) == 0))
+                || (z != 15 && chunk.voxels[i + CHUNK_SIZE] == 0)
+            {
+                request_tile(
+                    &look_up,
+                    voxel,
+                    Direction::Forward,
+                    position,
+                    &mut tile_requests,
+                )
             }
         }
     }
 
-    let mut meshes : Vec<(u32, Mesh)> = Vec::new();
+    let mut meshes: Vec<(u32, Mesh)> = Vec::new();
 
     for tile_id in tile_requests.keys() {
-        let mut positions : Vec<[f32; 3]> = Vec::new();
-        let mut normals : Vec<[f32;3]> = Vec::new();
-        let mut uvs : Vec<[f32; 2]> = Vec::new();
-        let mut indices : Vec<u32> = Vec::new();
-        
+        let mut positions: Vec<[f32; 3]> = Vec::new();
+        let mut normals: Vec<[f32; 3]> = Vec::new();
+        let mut uvs: Vec<[f32; 2]> = Vec::new();
+        let mut indices: Vec<u32> = Vec::new();
+
         let requests = &tile_requests[tile_id];
         for request in requests {
-            insert_tile(&mut positions, &mut normals, &mut uvs, &mut indices, request.0, request.1);
+            insert_tile(
+                &mut positions,
+                &mut normals,
+                &mut uvs,
+                &mut indices,
+                request.0,
+                request.1,
+            );
         }
 
         let mut mesh = Mesh::new(PrimitiveTopology::TriangleList);
@@ -155,5 +226,3 @@ pub fn build_chunk_meshes(chunk_slice: voxel::VorldSlice, look_up: [[u32; 6]; 25
 
     meshes
 }
-
-
