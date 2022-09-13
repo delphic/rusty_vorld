@@ -51,7 +51,7 @@ impl Vorld {
         )
     }
 
-    fn get_block_indices(chunk_key: IVec3, x: i32, y: i32, z: i32) -> (usize, usize, usize) {
+    fn get_position_in_chunk(chunk_key: IVec3, x: i32, y: i32, z: i32) -> (usize, usize, usize) {
         (
             (x - chunk_key.x * CHUNK_SIZE_I32).try_into().unwrap(),
             (y - chunk_key.y * CHUNK_SIZE_I32).try_into().unwrap(),
@@ -62,14 +62,14 @@ impl Vorld {
     pub fn add_voxel(&mut self, id: u8, x: i32, y: i32, z: i32) {
         let key = Self::get_chunk_key(x, y, z);
         if let Some(chunk) = self.chunks.get_mut(&key) {
-            let block_indicies = Self::get_block_indices(key, x, y, z);
+            let block_indicies = Self::get_position_in_chunk(key, x, y, z);
             chunk.add_voxel(id, block_indicies.0, block_indicies.1, block_indicies.2);
         } else {
             let mut chunk = Chunk {
                 indices: key,
                 voxels: [BlockIds::Air as u8; CHUNK_ARRAY_SIZE],
             };
-            let block_indicies = Self::get_block_indices(key, x, y, z);
+            let block_indicies = Self::get_position_in_chunk(key, x, y, z);
             chunk.add_voxel(id, block_indicies.0, block_indicies.1, block_indicies.2);
             self.chunks.insert(key, chunk);
         }
@@ -79,7 +79,7 @@ impl Vorld {
     pub fn get_voxel(&self, x: i32, y: i32, z: i32) -> u8 {
         let key = Self::get_chunk_key(x, y, z);
         if let Some(chunk) = self.chunks.get(&key) {
-            let block_indicies = Self::get_block_indices(key, x, y, z);
+            let block_indicies = Self::get_position_in_chunk(key, x, y, z);
             chunk.get_voxel(block_indicies.0, block_indicies.1, block_indicies.2)
         } else {
             BlockIds::Air as u8
@@ -90,33 +90,23 @@ impl Vorld {
         if let Some(chunk) = self.chunks.get(&chunk_key) {
             return Some(VorldSlice {
                 chunk: *chunk,
-                up_chunk: self
-                    .chunks
-                    .get(&IVec3::new(chunk_key.x, chunk_key.y + 1, chunk_key.z))
-                    .copied(),
-                down_chunk: self
-                    .chunks
-                    .get(&IVec3::new(chunk_key.x, chunk_key.y - 1, chunk_key.z))
-                    .copied(),
-                left_chunk: self
-                    .chunks
-                    .get(&IVec3::new(chunk_key.x + 1, chunk_key.y, chunk_key.z))
-                    .copied(),
-                right_chunk: self
-                    .chunks
-                    .get(&IVec3::new(chunk_key.x - 1, chunk_key.y, chunk_key.z))
-                    .copied(),
-                forward_chunk: self
-                    .chunks
-                    .get(&IVec3::new(chunk_key.x, chunk_key.y, chunk_key.z + 1))
-                    .copied(),
-                back_chunk: self
-                    .chunks
-                    .get(&IVec3::new(chunk_key.x, chunk_key.y, chunk_key.z - 1))
-                    .copied(),
+                up_chunk: self.get_adjacent_chunk(chunk_key, IVec3::Y),
+                down_chunk: self.get_adjacent_chunk(chunk_key, IVec3::NEG_Y),
+                left_chunk: self.get_adjacent_chunk(chunk_key, IVec3::X),
+                right_chunk: self.get_adjacent_chunk(chunk_key, IVec3::NEG_X),
+                forward_chunk: self.get_adjacent_chunk(chunk_key, IVec3::Z),
+                back_chunk: self.get_adjacent_chunk(chunk_key, IVec3::NEG_Z),
             });
         }
         None
+    }
+    
+    fn get_adjacent_chunk(&self, chunk_key: &IVec3, offset: IVec3) -> Option<Chunk> {
+        self.chunks.get(&IVec3::new(
+            chunk_key.x + offset.x,
+            chunk_key.y + offset.y,
+            chunk_key.z + offset.z))
+        .copied()
     }
 }
 
@@ -161,6 +151,10 @@ impl Chunk {
         } else {
             panic!("Received get_voxel request outside chunk bounds");
         }
+    }
+
+    pub fn get_block_position(i: usize) -> (usize, usize, usize) {
+        ( i % CHUNK_SIZE, i / (CHUNK_SIZE * CHUNK_SIZE), (i / CHUNK_SIZE) % CHUNK_SIZE)
     }
 }
 
