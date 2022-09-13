@@ -100,7 +100,7 @@ impl Vorld {
         }
         None
     }
-    
+
     fn get_adjacent_chunk(&self, chunk_key: &IVec3, offset: IVec3) -> Option<Chunk> {
         self.chunks.get(&IVec3::new(
             chunk_key.x + offset.x,
@@ -197,11 +197,11 @@ pub fn setup(mut commands: Commands, voxel_config: Res<VoxelConfig>) {
         }
     }
 
-    for x in 4..=12 {
-        for z in 4..=12 {
+    for x in 4..12 {
+        for z in 4..12 {
             for y in 1..18 {
-                if (x == 4 || x == 12 || z == 4 || z == 12)
-                    && !((x == 8 || x == 9) && z == 4 && y <= 2)
+                if (x == 4 || x == 11 || z == 4 || z == 11)
+                    && !((x == 7 || x == 8) && z == 4 && y <= 2)
                 {
                     vorld.add_voxel(BlockIds::StoneBlocks as u8, x, y, z);
                 }
