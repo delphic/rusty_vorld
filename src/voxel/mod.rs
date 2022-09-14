@@ -34,7 +34,7 @@ pub fn init(app: &mut App) {
     look_up[BlockIds::StoneBlocks as usize] = [4, 4, 5, 5, 4, 4];
     look_up[BlockIds::Wood as usize] = [9, 9, 8, 8, 9, 9];
     look_up[BlockIds::Planks as usize] = [10, 10, 10, 10, 10, 10];
-    look_up[BlockIds::Debug as usize] = [17, 18, 15, 16, 19, 20];
+    look_up[BlockIds::Debug as usize] = [17, 18, 15, 16, 20, 19];
     look_up[BlockIds::Rink as usize] = [21, 21, 21, 21, 21, 21];
     app.insert_resource(VoxelConfig {
         id_to_tile: look_up,
@@ -63,6 +63,7 @@ pub fn setup(mut commands: Commands, voxel_config: Res<VoxelConfig>) {
         }
     }
 
+    // Palette / tile lookup debug
     // for i in 0..9 {
     //     world.add_voxel(i+1, 2 * i as i32 - 5, 2, 2);
     // }
