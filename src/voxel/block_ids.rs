@@ -3,5 +3,12 @@
 pub enum BlockIds {
     Air = 0,
     Grass = 1,
-    StoneBlocks = 2,
+    Soil = 2,
+    Stone = 3,
+    StoneSlab = 4,
+    StoneBlocks = 5,
+    Wood = 6,
+    Planks = 7,
+    Debug = 8,
+    Rink = 9,
 }
