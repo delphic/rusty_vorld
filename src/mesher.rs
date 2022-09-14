@@ -1,11 +1,11 @@
-use super::voxel;
-use super::voxel::{Direction, CHUNK_SIZE};
+use super::voxel::prelude::*;
 use bevy::{
     prelude::*,
     render::mesh::Indices,
     render::{mesh::Mesh, render_resource::PrimitiveTopology},
 };
 use std::{collections::HashMap, convert::TryInto};
+use crate::voxel::direction::Direction;
 
 fn insert_tile(
     positions: &mut Vec<[f32; 3]>,
@@ -90,7 +90,7 @@ fn request_tile(
     }
 }
 
-fn is_adjacent_block_clear(chunk_option: &Option<voxel::Chunk>, x: usize, y: usize, z: usize) -> bool {
+fn is_adjacent_block_clear(chunk_option: &Option<Chunk>, x: usize, y: usize, z: usize) -> bool {
     if let Some(chunk) = chunk_option {
         return chunk.get_voxel(x, y, z) == 0;
     }
@@ -100,45 +100,45 @@ fn is_adjacent_block_clear(chunk_option: &Option<voxel::Chunk>, x: usize, y: usi
 /// Builds a Vec of meshes one per tile id required for the chunk
 /// Currently material per tile id as set by uniform, alternative is packing tile info into custom vertex format
 pub fn build_chunk_meshes(
-    chunk_slice: voxel::VorldSlice,
+    vorld_slice: VorldSlice,
     look_up: [[u32; 6]; 256],
 ) -> Vec<(u32, Mesh)> {
     // Build map of tiles required with direction and position
-    let mut tile_requests: HashMap<u32, Vec<(voxel::Direction, (usize, usize, usize))>> =
+    let mut tile_requests: HashMap<u32, Vec<(Direction, (usize, usize, usize))>> =
         HashMap::new();
-    let chunk = chunk_slice.chunk;
+    let chunk = vorld_slice.chunk;
     for i in 0..chunk.voxels.len() {
         let voxel = chunk.voxels[i];
         if voxel != 0 {
-            let position = voxel::Chunk::get_block_position(i);
+            let position = Chunk::get_block_position(i);
             let (x, y, z) = position;
 
-            if (x == 0 && is_adjacent_block_clear(&chunk_slice.right_chunk, CHUNK_SIZE - 1, y, z))
+            if (x == 0 && is_adjacent_block_clear(&vorld_slice.right_chunk, CHUNK_SIZE - 1, y, z))
                 || (x != 0 && chunk.voxels[i - 1] == 0)
             {
                 request_tile(&look_up, voxel, Direction::Right, position, &mut tile_requests)
             }
-            if (y == 0 && is_adjacent_block_clear(&chunk_slice.down_chunk, x, CHUNK_SIZE - 1, z))
+            if (y == 0 && is_adjacent_block_clear(&vorld_slice.down_chunk, x, CHUNK_SIZE - 1, z))
                 || (y != 0 && chunk.voxels[i - CHUNK_SIZE * CHUNK_SIZE] == 0)
             {
                 request_tile(&look_up, voxel, Direction::Down, position, &mut tile_requests)
             }
-            if (z == 0 && is_adjacent_block_clear(&chunk_slice.back_chunk, x, y, CHUNK_SIZE - 1))
+            if (z == 0 && is_adjacent_block_clear(&vorld_slice.back_chunk, x, y, CHUNK_SIZE - 1))
                 || (z != 0 && chunk.voxels[i - CHUNK_SIZE] == 0)
             {
                 request_tile(&look_up, voxel, Direction::Back, position, &mut tile_requests)
             }
-            if (x == 15 && is_adjacent_block_clear(&chunk_slice.left_chunk, 0, y, z))
+            if (x == 15 && is_adjacent_block_clear(&vorld_slice.left_chunk, 0, y, z))
                 || (x != 15 && chunk.voxels[i + 1] == 0)
             {
                 request_tile(&look_up, voxel, Direction::Left, position, &mut tile_requests)
             }
-            if (y == 15 && is_adjacent_block_clear(&chunk_slice.up_chunk, x, 0, z))
+            if (y == 15 && is_adjacent_block_clear(&vorld_slice.up_chunk, x, 0, z))
                 || (y != 15 && chunk.voxels[i + CHUNK_SIZE * CHUNK_SIZE] == 0)
             {
                 request_tile(&look_up, voxel, Direction::Up, position, &mut tile_requests)
             }
-            if (z == 15 && is_adjacent_block_clear(&chunk_slice.forward_chunk, x, y, 0))
+            if (z == 15 && is_adjacent_block_clear(&vorld_slice.forward_chunk, x, y, 0))
                 || (z != 15 && chunk.voxels[i + CHUNK_SIZE] == 0)
             {
                 request_tile(&look_up, voxel, Direction::Forward, position, &mut tile_requests)
