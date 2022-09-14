@@ -39,25 +39,25 @@ fn insert_tile(
         ([1.0, 0.0, 1.0], [0.0, 1.0]),
         ([0.0, 0.0, 1.0], [1.0, 1.0]),
         // left
-        ([1.0, 0.0, 0.0], [1.0, 1.0]),
-        ([1.0, 1.0, 0.0], [1.0, 0.0]),
-        ([1.0, 1.0, 1.0], [0.0, 0.0]),
-        ([1.0, 0.0, 1.0], [0.0, 1.0]),
-        // right
         ([0.0, 0.0, 0.0], [0.0, 1.0]),
         ([0.0, 0.0, 1.0], [1.0, 1.0]),
         ([0.0, 1.0, 1.0], [1.0, 0.0]),
         ([0.0, 1.0, 0.0], [0.0, 0.0]),
+        // right
+        ([1.0, 0.0, 0.0], [1.0, 1.0]),
+        ([1.0, 1.0, 0.0], [1.0, 0.0]),
+        ([1.0, 1.0, 1.0], [0.0, 0.0]),
+        ([1.0, 0.0, 1.0], [0.0, 1.0]),
     ];
 
     for _ in 0..4 {
         normals.push(match direction {
             Direction::Forward => [0.0, 0.0, 1.0],
             Direction::Back => [0.0, 0.0, -1.0],
-            Direction::Left => [1.0, 0.0, 0.0],
-            Direction::Right => [-1.0, 0.0, 0.0],
             Direction::Up => [0.0, 1.0, 0.0],
             Direction::Down => [0.0, -1.0, 0.0],
+            Direction::Right => [1.0, 0.0, 0.0],
+            Direction::Left => [-1.0, 0.0, 0.0],
         });
     }
 
@@ -113,10 +113,10 @@ pub fn build_chunk_meshes(
             let position = Chunk::get_block_position(i);
             let (x, y, z) = position;
 
-            if (x == 0 && is_adjacent_block_clear(&vorld_slice.right_chunk, CHUNK_SIZE - 1, y, z))
+            if (x == 0 && is_adjacent_block_clear(&vorld_slice.left_chunk, CHUNK_SIZE - 1, y, z))
                 || (x != 0 && chunk.voxels[i - 1] == 0)
             {
-                request_tile(&look_up, voxel, Direction::Right, position, &mut tile_requests)
+                request_tile(&look_up, voxel, Direction::Left, position, &mut tile_requests)
             }
             if (y == 0 && is_adjacent_block_clear(&vorld_slice.down_chunk, x, CHUNK_SIZE - 1, z))
                 || (y != 0 && chunk.voxels[i - CHUNK_SIZE * CHUNK_SIZE] == 0)
@@ -128,10 +128,10 @@ pub fn build_chunk_meshes(
             {
                 request_tile(&look_up, voxel, Direction::Back, position, &mut tile_requests)
             }
-            if (x == 15 && is_adjacent_block_clear(&vorld_slice.left_chunk, 0, y, z))
+            if (x == 15 && is_adjacent_block_clear(&vorld_slice.right_chunk, 0, y, z))
                 || (x != 15 && chunk.voxels[i + 1] == 0)
             {
-                request_tile(&look_up, voxel, Direction::Left, position, &mut tile_requests)
+                request_tile(&look_up, voxel, Direction::Right, position, &mut tile_requests)
             }
             if (y == 15 && is_adjacent_block_clear(&vorld_slice.up_chunk, x, 0, z))
                 || (y != 15 && chunk.voxels[i + CHUNK_SIZE * CHUNK_SIZE] == 0)
