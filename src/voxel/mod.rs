@@ -47,7 +47,12 @@ pub fn init(app: &mut App) {
 struct ComputeChunkMeshes(Task<(IVec3, Vec<(u32, Mesh)>)>);
 
 pub fn setup(mut commands: Commands, voxel_config: Res<VoxelConfig>) {
-    // Generate World
+    let world = build_controller_test_vorld();
+    async_instantiate_world(&mut commands, &world, &voxel_config)
+}
+
+#[allow(dead_code)]
+fn build_chunk_test_vorld() -> Vorld {
     let mut world = Vorld {
         chunks: HashMap::new(),
     };
@@ -81,7 +86,82 @@ pub fn setup(mut commands: Commands, voxel_config: Res<VoxelConfig>) {
         }
     }
 
-    async_instantiate_world(&mut commands, &world, &voxel_config)
+    world
+}
+
+#[allow(dead_code)]
+fn build_controller_test_vorld() -> Vorld {
+    let mut world = Vorld {
+        chunks: HashMap::new(),
+    };
+
+    // Grass base!
+    for x in -32..32 {
+        for z in -32..32 {
+            world.add_voxel(BlockIds::Grass as u8, x, -1, z);
+        }
+    }
+
+    // Pyramid!
+    for i in 0..4 {
+        let hw = 4-i;
+        for x in -hw..hw {
+            for z in -hw..hw {
+                world.add_voxel(BlockIds::StoneBlocks as u8, x, i, z);
+            }
+        }
+    }
+
+    // Jumps
+    let x_offset = -16;
+    let z_offset = -16;
+
+    let mut z = 0;
+    fill(&mut world, BlockIds::StoneBlocks as u8, 2, 1, 1, x_offset, 0, z + z_offset);
+
+    z -= 1;
+    for gap in 0..=5 {
+        z += 2 + gap;
+        fill(&mut world, BlockIds::StoneBlocks as u8, 2, 2, 2, x_offset, 0, z + z_offset);
+    }
+    
+    world.add_voxel(BlockIds::StoneBlocks as u8, x_offset + 3, 0, z_offset + 5);
+    fill(&mut world, BlockIds::StoneBlocks as u8, 1, 1, 2, x_offset + 3, 0, z_offset + 11);
+    fill(&mut world, BlockIds::StoneBlocks as u8, 1, 1, 3, x_offset + 3, 0, z_offset + 22);
+
+    fill(&mut world, BlockIds::StoneBlocks as u8, 2, 2, 2, x_offset + 4, 0, z_offset + 8);
+    fill(&mut world, BlockIds::StoneBlocks as u8, 2, 2, 2, x_offset + 4, 0, z_offset + 16);
+
+    // Grid
+    let x_offset = 16;
+    let z_offset = 0;
+    
+    for k in -1..=1 {
+        for i in -1..=1 {
+            world.add_voxel(BlockIds::StoneBlocks as u8, x_offset + 2 * i, 0, z_offset + 2 * k);
+        }
+    }
+
+    // Arches
+    let x_offset = -24;
+    let z_offset = 0;
+
+    for i in 0..2 {
+        fill(&mut world, BlockIds::StoneBlocks as u8, 3, 3-i, 1, x_offset - 1, 0, z_offset - 4 * i);
+        fill(&mut world, BlockIds::Air as u8, 1, 2-i, 1, x_offset, 0, z_offset - 4 * i);
+    }
+
+    world
+}
+
+fn fill(world: &mut Vorld, block: u8, width: i32, height: i32, depth: i32, x: i32 , y: i32, z: i32) {
+    for j in 0..height {
+        for k in 0..depth {
+            for i in 0..width {
+                world.add_voxel(block, x + i, y + j, z + k);
+              }      
+        }
+    }
 }
 
 fn point_in_chunk(v: i32) -> i32 {
