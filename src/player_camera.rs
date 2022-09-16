@@ -11,6 +11,7 @@ struct PlayerCamera {
     /// The desired angle around the global y axis, 0 -> 2π
     yaw: f32,
     velocity: Vec3,
+    is_grounded: bool,
 }
 
 pub fn add_systems(app: &mut App) {
@@ -29,6 +30,7 @@ fn setup(mut commands: Commands) {
             pitch: 0.0,
             yaw: std::f32::consts::PI,
             velocity: Vec3::ZERO,
+            is_grounded: false,
         });
 }
 
@@ -38,9 +40,15 @@ fn move_camera(
     rapier_context: Res<RapierContext>,
     mut camera_query: Query<(&mut Transform, &mut PlayerCamera)>,
 ) {
-    let movement_speed = 8.0;
-    let jump_delta_v = 7.5;
-    let acceleration_due_to_gravity = 2.0 * 9.8;
+    // Movement Config - previous defaults as comments
+    let acceleration = 80.0; // 80.0
+    let air_acceleration = 10.0; // 10.0
+    let max_run_speed = 5.5; // 5.5
+    let max_air_movement_speed = 4.0; // 4.0
+    let stop_speed = 1.5; // 1.5
+
+    let jump_delta_v = 7.5; // 7.5
+    let acceleration_due_to_gravity = 2.0 * 9.8; // 2 * 9.8
 
     let (mut camera_transform, mut player_camera) = camera_query.iter_mut().last().unwrap();
 
@@ -60,17 +68,106 @@ fn move_camera(
 
     let mut collision_disabled = false;
 
-    // TODO: Convert to movement acceleration and retain existing velocity
-    let desired_velocity = movement_speed * player_input.movement_direction.x * local_x
-        + movement_speed * player_input.movement_direction.z * local_z;
-    
-    
+    // Transform movement input into world_space 
+    let input_vector = player_input.movement_direction.x * local_x + player_input.movement_direction.z * local_z;
+
+    if !player_camera.is_grounded && player_camera.velocity.length_squared() > 0.0 {
+        // Apply Drag 
+        let air_speed = player_camera.velocity.length();
+        let drag_delta_v = air_speed * air_speed * 1.225 * time_delta / 200.0;
+        // Assumes in air and mass of 100kg, drag coefficient of ~1 and surface area ~1
+        
+        if air_speed < drag_delta_v { // Happens at around air_speed of 99 m/s
+            player_camera.velocity = Vec3::ZERO;
+            // If we wanted to support drag at extremely high speeds properly would need to average drag across the frame, rather than instanteous maximum
+        } else {
+            player_camera.velocity *= (air_speed - drag_delta_v) / air_speed;
+        }
+    }
+
+    let player_xz_velocity = Vec3::new(player_camera.velocity.x, 0.0, player_camera.velocity.z);
+    // should be on movement plane see comment above about local x/z plane
+
+    let mut target_velocity = player_xz_velocity;
+    if player_camera.is_grounded {
+        let max_movement_speed = max_run_speed; // May change in future to allow sprint & walk
+        let max_movement_speed_sqr = max_movement_speed * max_movement_speed;
+        let v_sqr = player_xz_velocity.length_squared();
+        let is_sliding = v_sqr > max_movement_speed_sqr + 0.001;
+
+        if is_sliding {
+            // Only allow deceleration if moving faster than max movment speed
+            if player_xz_velocity.x.is_sign_positive() == input_vector.x.is_sign_negative() {
+                target_velocity.x += acceleration * time_delta * input_vector.x;
+            }
+            if player_xz_velocity.z.is_sign_positive() == input_vector.z.is_sign_negative() {
+                target_velocity.z += acceleration * time_delta * input_vector.z;
+            }
+        } else {
+            target_velocity += acceleration * time_delta * input_vector;
+        }
+
+        let ground_speed_sqr = target_velocity.length_squared();
+        let any_input = player_input.movement_direction.length_squared() > 0.0;
+        if !is_sliding && any_input {
+            if ground_speed_sqr > max_movement_speed_sqr {
+                target_velocity = max_movement_speed * target_velocity.normalize();
+            }
+        } else if ground_speed_sqr > 0.0 && (!any_input || is_sliding) {
+            // Apply slow down force
+            // this tries to model someone at a run decided to stop if in the 0 to max movement speed range
+            // greater than this and they are considered sliding and a different formula is used
+            let ground_speed = ground_speed_sqr.sqrt();
+            
+            let slow_factor = match is_sliding {
+                false => 2.5,
+                true => 5.0 / ground_speed,
+                // Velocities larger than 24 m/s at 60fps (for 60 / slowFactor) are negated immediately when speed
+                // reduction proportional to v^2, so for velocities higher than this make speed reduction proportional to v
+                // by dividing the slow factor by velocity magnitude.
+                // Rationale is controller is "sliding" rather than coming to a controlled stop
+            };
+
+            let delta_v = (ground_speed * ground_speed * slow_factor * time_delta).min(ground_speed);
+
+            if ground_speed < stop_speed || ground_speed == 0.0 {
+                target_velocity = Vec3::ZERO;
+            } else {
+                target_velocity *= (ground_speed - delta_v) / ground_speed;
+            }
+        }
+    } else {
+        // Calcualte Air Movement
+        let target_x = player_xz_velocity.x + air_acceleration * time_delta * input_vector.x;
+        let target_z = player_xz_velocity.z + air_acceleration * time_delta * input_vector.z;
+        
+        let max_air_movement_speed_sqr = max_air_movement_speed * max_air_movement_speed;
+        let target_air_speed_sqr = target_x * target_x + target_z * target_z;
+        let can_accelerate = target_air_speed_sqr < max_air_movement_speed_sqr;
+
+        if can_accelerate || target_x.abs() < player_xz_velocity.x.abs() {
+            target_velocity.x = target_x;
+        }
+        if can_accelerate || target_z.abs() < player_xz_velocity.z.abs() {
+            target_velocity.z = target_z;
+        }
+
+        if !(target_velocity.x == target_x && target_velocity.z == target_z) {
+            // Must be above max air movement speed, and not trying to decelerate in both axes
+            let redirect_threshold_speed_sqr = (max_run_speed * max_run_speed).max(max_air_movement_speed_sqr);
+            let current_air_speed_sqr = target_velocity.length_squared(); 
+            if current_air_speed_sqr < redirect_threshold_speed_sqr {
+            // allow redirection of the direction of air movement if below redirect threshold
+                target_velocity = (current_air_speed_sqr.sqrt() / target_air_speed_sqr.sqrt()) * Vec3::new(target_x, 0.0, target_z);
+            }
+        }
+    }
+
     let start_translation = camera_transform.translation;
 
-    if desired_velocity.length_squared() > 0.0 {
-
-        let velocity_direction = desired_velocity.normalize();
-        let velocity_magnitude = desired_velocity.length();
+    if target_velocity.length_squared() > 0.0 {
+        let velocity_direction = target_velocity.normalize();
+        let velocity_magnitude = target_velocity.length();
 
         if let Some((_, hit)) = rapier_context.cast_shape(
             camera_transform.translation,
@@ -83,7 +180,7 @@ fn move_camera(
             if hit.toi == 0.0 {
                 // Already overlapping - should only happen if teleported or spawned inside collider
                 warn!("Started camera movement already overlapping, collision disabled");
-                camera_transform.translation += desired_velocity * time_delta;
+                camera_transform.translation += target_velocity * time_delta;
                 collision_disabled = true;
             } else {
                 // Desired movement collides, attempt to slide along surface
@@ -94,7 +191,7 @@ fn move_camera(
 
                 let stop_time = close_distance / velocity_magnitude;
                 let time_remainder = time_delta - stop_time;
-                let velocity_remainder = desired_velocity * time_remainder / time_delta;
+                let velocity_remainder = target_velocity * time_remainder / time_delta;
                 let slide_velocity =
                     velocity_remainder - velocity_remainder.dot(hit.normal1) * hit.normal1;
                 let slide_velocity_direction = slide_velocity.normalize();
@@ -140,7 +237,7 @@ fn move_camera(
                 }
             }
         } else {
-            camera_transform.translation += desired_velocity * time_delta;
+            camera_transform.translation += target_velocity * time_delta;
         }
 
         if !collision_disabled {
@@ -155,15 +252,13 @@ fn move_camera(
     }
 
     // Handle requested y-movement / movement due to gravity
-
     let vertical_velocity = match player_input.jump_requested {
-        true => jump_delta_v, // ^^ Air jump style - arrest all vertical momentum 
+        true => { 
+            player_input.jump_requested = false;
+            jump_delta_v // ^^ Air jump style - arrest all vertical momentum 
+        },
         false => player_camera.velocity.y - acceleration_due_to_gravity * time_delta,
     };
-
-    if player_input.jump_requested {
-        player_input.jump_requested = false;
-    }
 
     let direction = match vertical_velocity > 0.0 {
         true => Vec3::Y,
@@ -182,8 +277,10 @@ fn move_camera(
         ) {
             let close_distance = hit.toi - skin_depth;
             camera_transform.translation += direction * close_distance;
+            player_camera.is_grounded = vertical_velocity < 0.0;
         } else {
             camera_transform.translation += direction * vertical_velocity.abs() * time_delta;
+            player_camera.is_grounded = false;
         }
 
         if !collision_disabled {
