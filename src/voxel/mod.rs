@@ -151,6 +151,14 @@ fn build_controller_test_vorld() -> Vorld {
         fill(&mut world, BlockIds::Air as u8, 1, 2-i, 1, x_offset, 0, z_offset - 4 * i);
     }
 
+    // Larger arches!
+    fill(&mut world, BlockIds::StoneBlocks as u8, 4, 3, 1, x_offset - 1, 0, z_offset + 4);
+    fill(&mut world, BlockIds::Air as u8, 2, 2, 1, x_offset, 0, z_offset + 4);
+
+    fill(&mut world, BlockIds::StoneBlocks as u8, 4, 4, 1, x_offset - 1, 0, z_offset + 8);
+    fill(&mut world, BlockIds::Air as u8, 2, 3, 1, x_offset, 0, z_offset + 8);
+
+
     world
 }
 
@@ -159,7 +167,7 @@ fn fill(world: &mut Vorld, block: u8, width: i32, height: i32, depth: i32, x: i3
         for k in 0..depth {
             for i in 0..width {
                 world.add_voxel(block, x + i, y + j, z + k);
-              }      
+              }
         }
     }
 }

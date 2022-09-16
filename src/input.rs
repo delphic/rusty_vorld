@@ -3,12 +3,14 @@ use bevy::{input::mouse::MouseMotion, prelude::*};
 pub struct PlayerInput {
     pub mouse_motion: Vec2,
     pub movement_direction: Vec3,
+    pub jump_requested: bool,
 }
 
 pub fn insert_resources(app: &mut App) {
     app.insert_resource(PlayerInput {
         mouse_motion: Vec2::ZERO,
         movement_direction: Vec3::ZERO,
+        jump_requested: false,
     });
 }
 
@@ -38,6 +40,11 @@ fn detect_player_input(
         delta_z += 1.0;
     }
 
+    if delta_x != 0.0 && delta_z != 0.0 {
+        delta_x /= std::f32::consts::SQRT_2;
+        delta_z /= std::f32::consts::SQRT_2;
+    }
+
     player_input.movement_direction = Vec3::new(delta_x, 0.0, delta_z);
 
     player_input.mouse_motion = Vec2::ZERO;
@@ -46,4 +53,6 @@ fn detect_player_input(
             player_input.mouse_motion += event.delta;
         }
     }
+
+    player_input.jump_requested = player_input.jump_requested || keyboard_input.just_pressed(KeyCode::Space);
 }
