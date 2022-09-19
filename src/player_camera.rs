@@ -92,48 +92,40 @@ fn move_camera(
     if player_camera.is_grounded {
         let max_movement_speed = max_run_speed; // May change in future to allow sprint & walk
         let max_movement_speed_sqr = max_movement_speed * max_movement_speed;
-        let v_sqr = player_xz_velocity.length_squared();
-        let is_sliding = v_sqr > max_movement_speed_sqr + 0.001;
+        let speed_sqr = player_xz_velocity.length_squared();
+        let is_sliding = speed_sqr > max_movement_speed_sqr + 0.001;
+        let any_input = player_input.movement_direction.length_squared() > 0.0;
 
         if is_sliding {
+            // Apply linear slowing force
+            // Proportional to v can quickly result at velocity being negated at high speeds 
+            target_velocity *= 1.0 - (5.0 * time_delta).min(1.0);
+
             // Only allow deceleration if moving faster than max movment speed
-            if player_xz_velocity.x.is_sign_positive() == input_vector.x.is_sign_negative() {
+            if player_xz_velocity.x.is_sign_positive() != input_vector.x.is_sign_positive() {
                 target_velocity.x += acceleration * time_delta * input_vector.x;
             }
-            if player_xz_velocity.z.is_sign_positive() == input_vector.z.is_sign_negative() {
+            if player_xz_velocity.z.is_sign_positive() != input_vector.z.is_sign_positive() {
                 target_velocity.z += acceleration * time_delta * input_vector.z;
             }
-        } else {
+        } else if any_input {
+            // Apply slow if input in opposite direction to velocity for faster change of direction
+            if player_xz_velocity.x.is_sign_positive() != input_vector.x.is_sign_positive() {
+                target_velocity.x *= 1.0 - (2.5 * speed_sqr.sqrt() * time_delta).min(1.0);
+            } 
+            if player_xz_velocity.z.is_sign_positive() != input_vector.z.is_sign_positive() {
+                target_velocity.z *= 1.0 - (2.5 * speed_sqr.sqrt() * time_delta).min(1.0);
+            }
             target_velocity += acceleration * time_delta * input_vector;
-        }
-
-        let ground_speed_sqr = target_velocity.length_squared();
-        let any_input = player_input.movement_direction.length_squared() > 0.0;
-        if !is_sliding && any_input {
-            if ground_speed_sqr > max_movement_speed_sqr {
+            
+            if target_velocity.length_squared() > max_movement_speed_sqr {
                 target_velocity = max_movement_speed * target_velocity.normalize();
             }
-        } else if ground_speed_sqr > 0.0 && (!any_input || is_sliding) {
-            // Apply slow down force
-            // this tries to model someone at a run decided to stop if in the 0 to max movement speed range
-            // greater than this and they are considered sliding and a different formula is used
-            let ground_speed = ground_speed_sqr.sqrt();
-            
-            let slow_factor = match is_sliding {
-                false => 2.5,
-                true => 5.0 / ground_speed,
-                // Velocities larger than 24 m/s at 60fps (for 60 / slowFactor) are negated immediately when speed
-                // reduction proportional to v^2, so for velocities higher than this make speed reduction proportional to v
-                // by dividing the slow factor by velocity magnitude.
-                // Rationale is controller is "sliding" rather than coming to a controlled stop
-            };
-
-            let delta_v = (ground_speed * ground_speed * slow_factor * time_delta).min(ground_speed);
-
-            if ground_speed < stop_speed || ground_speed == 0.0 {
+        } else {
+            if speed_sqr < stop_speed * stop_speed {
                 target_velocity = Vec3::ZERO;
             } else {
-                target_velocity *= (ground_speed - delta_v) / ground_speed;
+                target_velocity *= (2.5 * speed_sqr.sqrt() * time_delta).min(1.0)
             }
         }
     } else {
