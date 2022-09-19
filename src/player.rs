@@ -5,40 +5,48 @@ use super::input::PlayerInput;
 use super::utils;
 
 #[derive(Component)]
+struct Player {
+    velocity: Vec3,
+    is_grounded: bool,
+}
+
+#[derive(Component)]
 struct PlayerCamera {
     /// The desired angle around the local x axis, -π/2 -> π/2
     pitch: f32,
     /// The desired angle around the global y axis, 0 -> 2π
     yaw: f32,
-    velocity: Vec3,
-    is_grounded: bool,
 }
 
 pub fn add_systems(app: &mut App) {
     app.add_startup_system(setup)
-        .add_system(rotate_camera)
-        .add_system(move_camera);
+        .add_system(update_look)
+        .add_system(move_player);
 }
 
 fn setup(mut commands: Commands) {
     commands
-        .spawn_bundle(Camera3dBundle {
-            transform: Transform::from_xyz(8.0, 1.75, -8.0),
-            ..default()
-        })
-        .insert(PlayerCamera {
-            pitch: 0.0,
-            yaw: std::f32::consts::PI,
+        .spawn()
+        .insert_bundle(SpatialBundle { transform: Transform::from_xyz(8.0, 1.75, -8.0), ..default() })
+        .insert(Player {
             velocity: Vec3::ZERO,
             is_grounded: false,
+        }).with_children(|child_builder| {
+            child_builder.spawn_bundle(Camera3dBundle { 
+                transform: Transform::from_xyz(0.0, 0.25, 0.0),
+                ..default()
+            }).insert(PlayerCamera {
+                pitch: 0.0,
+                yaw: std::f32::consts::PI,
+            });
         });
 }
 
-fn move_camera(
+fn move_player(
     time: Res<Time>,
     mut player_input: ResMut<PlayerInput>,
     rapier_context: Res<RapierContext>,
-    mut camera_query: Query<(&mut Transform, &mut PlayerCamera)>,
+    mut player_query: Query<(&mut Transform, &mut Player)>,
 ) {
     // Movement Config - previous defaults as comments
     let acceleration = 80.0; // 80.0
@@ -50,10 +58,10 @@ fn move_camera(
     let jump_delta_v = 7.5; // 7.5
     let acceleration_due_to_gravity = 2.0 * 9.8; // 2 * 9.8
 
-    let (mut camera_transform, mut player_camera) = camera_query.iter_mut().last().unwrap();
+    let (mut player_transform, mut player) = player_query.iter_mut().last().unwrap();
 
-    let local_x = camera_transform.local_x();
-    let local_z = camera_transform.local_z();
+    let local_x = player_transform.local_x();
+    let local_z = player_transform.local_z();
     
     // Project to x/z plane (arguably should project onto plane of ground if grounded 0 if normal is ~45 degrees of vertical)
     let local_x = Vec3::new(local_x.x, 0.0, local_x.z).normalize();
@@ -71,25 +79,25 @@ fn move_camera(
     // Transform movement input into world_space 
     let input_vector = player_input.movement_direction.x * local_x + player_input.movement_direction.z * local_z;
 
-    if !player_camera.is_grounded && player_camera.velocity.length_squared() > 0.0 {
+    if !player.is_grounded && player.velocity.length_squared() > 0.0 {
         // Apply Drag 
-        let air_speed = player_camera.velocity.length();
+        let air_speed = player.velocity.length();
         let drag_delta_v = air_speed * air_speed * 1.225 * time_delta / 200.0;
         // Assumes in air and mass of 100kg, drag coefficient of ~1 and surface area ~1
         
         if air_speed < drag_delta_v { // Happens at around air_speed of 99 m/s
-            player_camera.velocity = Vec3::ZERO;
+            player.velocity = Vec3::ZERO;
             // If we wanted to support drag at extremely high speeds properly would need to average drag across the frame, rather than instanteous maximum
         } else {
-            player_camera.velocity *= (air_speed - drag_delta_v) / air_speed;
+            player.velocity *= (air_speed - drag_delta_v) / air_speed;
         }
     }
 
-    let player_xz_velocity = Vec3::new(player_camera.velocity.x, 0.0, player_camera.velocity.z);
+    let player_xz_velocity = Vec3::new(player.velocity.x, 0.0, player.velocity.z);
     // should be on movement plane see comment above about local x/z plane
 
     let mut target_velocity = player_xz_velocity;
-    if player_camera.is_grounded {
+    if player.is_grounded {
         let max_movement_speed = max_run_speed; // May change in future to allow sprint & walk
         let max_movement_speed_sqr = max_movement_speed * max_movement_speed;
         let speed_sqr = player_xz_velocity.length_squared();
@@ -155,14 +163,14 @@ fn move_camera(
         }
     }
 
-    let start_translation = camera_transform.translation;
+    let start_translation = player_transform.translation;
 
     if target_velocity.length_squared() > 0.0 {
         let velocity_direction = target_velocity.normalize();
         let velocity_magnitude = target_velocity.length();
 
         if let Some((_, hit)) = rapier_context.cast_shape(
-            camera_transform.translation,
+            player_transform.translation,
             Quat::IDENTITY,
             velocity_direction,
             &shape,
@@ -172,13 +180,13 @@ fn move_camera(
             if hit.toi == 0.0 {
                 // Already overlapping - should only happen if teleported or spawned inside collider
                 warn!("Started camera movement already overlapping, collision disabled");
-                camera_transform.translation += target_velocity * time_delta;
+                player_transform.translation += target_velocity * time_delta;
                 collision_disabled = true;
             } else {
                 // Desired movement collides, attempt to slide along surface
                 // NOTE: Casting in velocity direction means time of impact is in fact distance to impact
                 let close_distance = hit.toi - skin_depth;
-                camera_transform.translation += velocity_direction * close_distance;
+                player_transform.translation += velocity_direction * close_distance;
                 // ^^ This can be negative and will attempt to move the camera away before sliding along the surface
 
                 let stop_time = close_distance / velocity_magnitude;
@@ -190,7 +198,7 @@ fn move_camera(
                 let slide_velocity_magnitude = slide_velocity.length();
 
                 if let Some((_, second_hit)) = rapier_context.cast_shape(
-                    camera_transform.translation,
+                    player_transform.translation,
                     Quat::IDENTITY,
                     slide_velocity_direction,
                     &shape,
@@ -201,7 +209,7 @@ fn move_camera(
                     let second_slide_direction = hit.normal1.cross(second_hit.normal1);
 
                     let close_distance = second_hit.toi - skin_depth;
-                    camera_transform.translation += slide_velocity_direction * close_distance;
+                    player_transform.translation += slide_velocity_direction * close_distance;
 
                     let time_delta = time_remainder;
                     let stop_time = close_distance / slide_velocity_magnitude;
@@ -212,7 +220,7 @@ fn move_camera(
 
                     if rapier_context
                         .cast_shape(
-                            camera_transform.translation,
+                            player_transform.translation,
                             Quat::IDENTITY,
                             slide_velocity.normalize(),
                             &shape,
@@ -222,22 +230,22 @@ fn move_camera(
                         .is_none()
                     {
                         // Only move if there are no collisions only second slide axis, else only move up to second contact
-                        camera_transform.translation += slide_velocity * time_remainder;
+                        player_transform.translation += slide_velocity * time_remainder;
                     }
                 } else {
-                    camera_transform.translation += slide_velocity * time_remainder;
+                    player_transform.translation += slide_velocity * time_remainder;
                 }
             }
         } else {
-            camera_transform.translation += target_velocity * time_delta;
+            player_transform.translation += target_velocity * time_delta;
         }
 
         if !collision_disabled {
-            rapier_context.intersections_with_shape(camera_transform.translation, Quat::IDENTITY, &shape, QueryFilter::default(), |_| {
+            rapier_context.intersections_with_shape(player_transform.translation, Quat::IDENTITY, &shape, QueryFilter::default(), |_| {
                 // cast_shape sometimes lies about there being no collision due to float precision issues,
                 // so check for intersections and if found restore to starting position
                 warn!("Camera shape found to intersect world collider after movement, restoring to last valid position");
-                camera_transform.translation = start_translation;
+                player_transform.translation = start_translation;
                 false
             });
         }
@@ -249,7 +257,7 @@ fn move_camera(
             player_input.jump_requested = false;
             jump_delta_v // ^^ Air jump style - arrest all vertical momentum 
         },
-        false => player_camera.velocity.y - acceleration_due_to_gravity * time_delta,
+        false => player.velocity.y - acceleration_due_to_gravity * time_delta,
     };
 
     let direction = match vertical_velocity > 0.0 {
@@ -258,9 +266,9 @@ fn move_camera(
     };
 
     if vertical_velocity.abs() > 0.0 {
-        let reset_position = camera_transform.translation;
+        let reset_position = player_transform.translation;
         if let Some((_, hit)) = rapier_context.cast_shape(
-            camera_transform.translation,
+            player_transform.translation,
             Quat::IDENTITY,
             direction,
             &shape,
@@ -268,54 +276,60 @@ fn move_camera(
             QueryFilter::default(),
         ) {
             let close_distance = hit.toi - skin_depth;
-            camera_transform.translation += direction * close_distance;
-            player_camera.is_grounded = vertical_velocity < 0.0;
+            player_transform.translation += direction * close_distance;
+            player.is_grounded = vertical_velocity < 0.0;
         } else {
-            camera_transform.translation += direction * vertical_velocity.abs() * time_delta;
-            player_camera.is_grounded = false;
+            player_transform.translation += direction * vertical_velocity.abs() * time_delta;
+            player.is_grounded = false;
         }
 
         if !collision_disabled {
-            rapier_context.intersections_with_shape(camera_transform.translation, Quat::IDENTITY, &shape, QueryFilter::default(), |_| {
+            rapier_context.intersections_with_shape(player_transform.translation, Quat::IDENTITY, &shape, QueryFilter::default(), |_| {
                 // cast_shape sometimes lies about there being no collision due to float precision issues,
                 // so check for intersections and if found restore to starting position 
                 // NOTE: Have not seen this in the wild with pure vertical movement, yet
                 warn!("Camera shape found to intersect world collider after vertical movement, restoring to last valid position");
-                camera_transform.translation = reset_position;
+                player_transform.translation = reset_position;
                 false
             });
         }
     }
 
-    player_camera.velocity = (camera_transform.translation - start_translation) / time_delta;
+    player.velocity = (player_transform.translation - start_translation) / time_delta;
 }
 
-fn rotate_camera(
+fn update_look(
     time: Res<Time>,
     player_input: Res<PlayerInput>,
-    mut camera_query: Query<(&mut Transform, &mut PlayerCamera)>,
+    mut camera_query: Query<(&mut Transform, &mut PlayerCamera), Without<Player>>,
+    mut player_query: Query<(&mut Transform, &Children), With<Player>>,
 ) {
     let rotation_speed = 0.1; // TODO: degrees = dots * 0.022
+    if let Some((mut player_transform, children)) = player_query.iter_mut().last() {
+        for &child in children.iter() {
+            if let Ok((mut camera_transform, mut player_camera)) = camera_query.get_mut(child) {
+                // prevent rotation past 10 degrees towards vertical
+                let clamp_angle = std::f32::consts::PI * (0.5 - 10.0 / 180.0);
+                    
+                let scaled_mouse_delta = rotation_speed * time.delta_seconds() * player_input.mouse_motion;
 
-    if let Some((mut camera_transform, mut player_camera)) = camera_query.iter_mut().last() {
-        // prevent rotation past 10 degrees towards vertical
-        let clamp_angle = std::f32::consts::PI * (0.5 - 10.0 / 180.0);
+                let yaw = (player_camera.yaw - scaled_mouse_delta.x) % (2.0 * std::f32::consts::PI);
+                let pitch = utils::clamp(
+                    player_camera.pitch - scaled_mouse_delta.y,
+                    -clamp_angle,
+                    clamp_angle,
+                );
 
-        let scaled_mouse_delta = rotation_speed * time.delta_seconds() * player_input.mouse_motion;
+                player_transform.rotation = Quat::IDENTITY;
+                player_transform.rotate_axis(Vec3::Y, yaw);
 
-        let yaw = (player_camera.yaw - scaled_mouse_delta.x) % (2.0 * std::f32::consts::PI);
-        let pitch = utils::clamp(
-            player_camera.pitch - scaled_mouse_delta.y,
-            -clamp_angle,
-            clamp_angle,
-        );
+                let local_x = camera_transform.local_x();
+                camera_transform.rotation = Quat::IDENTITY;
+                camera_transform.rotate_axis(local_x, pitch);
 
-        camera_transform.rotation = Quat::IDENTITY;
-        camera_transform.rotate_axis(Vec3::Y, yaw);
-        let local_x = camera_transform.local_x();
-        camera_transform.rotate_axis(local_x, pitch);
-
-        player_camera.yaw = yaw;
-        player_camera.pitch = pitch;
+                player_camera.yaw = yaw;
+                player_camera.pitch = pitch;
+            }
+        }
     }
 }

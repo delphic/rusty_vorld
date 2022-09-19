@@ -4,7 +4,7 @@ use bevy_rapier3d::prelude::*;
 mod atlas_loader;
 mod input;
 mod mesher;
-mod player_camera;
+mod player;
 mod scene_spawner;
 mod utils;
 mod voxel;
@@ -34,7 +34,7 @@ impl Plugin for VorldPlugin {
 
         app.add_system(grab_mouse);
         input::add_systems(app);
-        player_camera::add_systems(app);
+        player::add_systems(app);
     }
 }
 
