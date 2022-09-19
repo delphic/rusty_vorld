@@ -27,13 +27,13 @@ pub fn add_systems(app: &mut App) {
 fn setup(mut commands: Commands) {
     commands
         .spawn()
-        .insert_bundle(SpatialBundle { transform: Transform::from_xyz(8.0, 1.75, -8.0), ..default() })
+        .insert_bundle(SpatialBundle { transform: Transform::from_xyz(8.0, 1.0, -8.0), ..default() })
         .insert(Player {
             velocity: Vec3::ZERO,
             is_grounded: false,
         }).with_children(|child_builder| {
             child_builder.spawn_bundle(Camera3dBundle { 
-                transform: Transform::from_xyz(0.0, 0.25, 0.0),
+                transform: Transform::from_xyz(0.0, 1.25, 0.0),
                 ..default()
             }).insert(PlayerCamera {
                 pitch: 0.0,
@@ -170,7 +170,7 @@ fn move_player(
         let velocity_magnitude = target_velocity.length();
 
         if let Some((_, hit)) = rapier_context.cast_shape(
-            player_transform.translation,
+            player_transform.translation + half_player_height * Vec3::Y,
             Quat::IDENTITY,
             velocity_direction,
             &shape,
@@ -241,13 +241,19 @@ fn move_player(
         }
 
         if !collision_disabled {
-            rapier_context.intersections_with_shape(player_transform.translation, Quat::IDENTITY, &shape, QueryFilter::default(), |_| {
-                // cast_shape sometimes lies about there being no collision due to float precision issues,
-                // so check for intersections and if found restore to starting position
-                warn!("Camera shape found to intersect world collider after movement, restoring to last valid position");
-                player_transform.translation = start_translation;
-                false
-            });
+            rapier_context.intersections_with_shape(
+                player_transform.translation + half_player_height * Vec3::Y,
+                Quat::IDENTITY,
+                &shape,
+                QueryFilter::default(),
+                |_| {
+                    // cast_shape sometimes lies about there being no collision due to float precision issues,
+                    // so check for intersections and if found restore to starting position
+                    warn!("Camera shape found to intersect world collider after movement, restoring to last valid position");
+                    player_transform.translation = start_translation;
+                    false
+                }
+            );
         }
     }
 
@@ -268,7 +274,7 @@ fn move_player(
     if vertical_velocity.abs() > 0.0 {
         let reset_position = player_transform.translation;
         if let Some((_, hit)) = rapier_context.cast_shape(
-            player_transform.translation,
+            player_transform.translation + half_player_height * Vec3::Y,
             Quat::IDENTITY,
             direction,
             &shape,
@@ -284,14 +290,20 @@ fn move_player(
         }
 
         if !collision_disabled {
-            rapier_context.intersections_with_shape(player_transform.translation, Quat::IDENTITY, &shape, QueryFilter::default(), |_| {
-                // cast_shape sometimes lies about there being no collision due to float precision issues,
-                // so check for intersections and if found restore to starting position 
-                // NOTE: Have not seen this in the wild with pure vertical movement, yet
-                warn!("Camera shape found to intersect world collider after vertical movement, restoring to last valid position");
-                player_transform.translation = reset_position;
-                false
-            });
+            rapier_context.intersections_with_shape(
+                player_transform.translation + half_player_height * Vec3::Y,
+                Quat::IDENTITY,
+                &shape,
+                QueryFilter::default(),
+                |_| {
+                    // cast_shape sometimes lies about there being no collision due to float precision issues,
+                    // so check for intersections and if found restore to starting position 
+                    // NOTE: Have not seen this in the wild with pure vertical movement, yet
+                    warn!("Camera shape found to intersect world collider after vertical movement, restoring to last valid position");
+                    player_transform.translation = reset_position;
+                    false
+                },
+            );
         }
     }
 
