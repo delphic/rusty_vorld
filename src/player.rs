@@ -70,7 +70,7 @@ fn move_player(
     let time_delta = time.delta_seconds();
 
     let skin_depth = 0.01;
-    let half_player_height = 1.0;
+    let half_player_height = match player_input.crouch_requested { false =>  1.0, true => 0.5 };
     let collider_radius = 0.25;
     let shape = Collider::capsule_y(half_player_height - skin_depth - collider_radius, collider_radius);
 
@@ -338,6 +338,12 @@ fn update_look(
                 let local_x = camera_transform.local_x();
                 camera_transform.rotation = Quat::IDENTITY;
                 camera_transform.rotate_axis(local_x, pitch);
+
+                if player_input.crouch_requested {
+                    camera_transform.translation.y = 0.75;
+                } else {
+                    camera_transform.translation.y = 1.25;
+                }
 
                 player_camera.yaw = yaw;
                 player_camera.pitch = pitch;

@@ -4,6 +4,7 @@ pub struct PlayerInput {
     pub mouse_motion: Vec2,
     pub movement_direction: Vec3,
     pub jump_requested: bool,
+    pub crouch_requested: bool,
 }
 
 pub fn insert_resources(app: &mut App) {
@@ -11,6 +12,7 @@ pub fn insert_resources(app: &mut App) {
         mouse_motion: Vec2::ZERO,
         movement_direction: Vec3::ZERO,
         jump_requested: false,
+        crouch_requested: false,
     });
 }
 
@@ -55,4 +57,5 @@ fn detect_player_input(
     }
 
     player_input.jump_requested = player_input.jump_requested || keyboard_input.just_pressed(KeyCode::Space);
+    player_input.crouch_requested = keyboard_input.pressed(KeyCode::LControl);
 }
