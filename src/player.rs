@@ -198,7 +198,7 @@ fn move_player(
                 let slide_velocity_magnitude = slide_velocity.length();
 
                 if let Some((_, second_hit)) = rapier_context.cast_shape(
-                    player_transform.translation,
+                    player_transform.translation + half_player_height * Vec3::Y,
                     Quat::IDENTITY,
                     slide_velocity_direction,
                     &shape,
