@@ -64,6 +64,7 @@ fn move_player(
     let collider_radius = 0.25;
 
     let jump_delta_v = 7.5; // 7.5
+    let crouch_jump_delta_v = 6.0;
     let acceleration_due_to_gravity = 2.0 * 9.8; // 2 * 9.8
 
     let (mut player_transform, mut player) = player_query.iter_mut().last().unwrap();
@@ -285,7 +286,11 @@ fn move_player(
     let vertical_velocity = match player_input.jump_requested {
         true => { 
             player_input.jump_requested = false;
-            jump_delta_v // ^^ Air jump style - arrest all vertical momentum 
+            match player.is_crouched {
+                true => crouch_jump_delta_v,
+                false => jump_delta_v,
+            }
+            // ^^ Air jump style - arrest all vertical momentum 
         },
         false => player.velocity.y - acceleration_due_to_gravity * time_delta,
     };
