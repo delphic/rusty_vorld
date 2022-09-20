@@ -8,6 +8,7 @@ use super::utils;
 struct Player {
     velocity: Vec3,
     is_grounded: bool,
+    is_crouched: bool,
 }
 
 #[derive(Component)]
@@ -31,6 +32,7 @@ fn setup(mut commands: Commands) {
         .insert(Player {
             velocity: Vec3::ZERO,
             is_grounded: false,
+            is_crouched: false,
         }).with_children(|child_builder| {
             child_builder.spawn_bundle(Camera3dBundle { 
                 transform: Transform::from_xyz(0.0, 1.25, 0.0),
@@ -55,10 +57,38 @@ fn move_player(
     let max_air_movement_speed = 4.0; // 4.0
     let stop_speed = 1.5; // 1.5
 
+    // Collider Values
+    let player_standing_half_height = 1.0;
+    let player_crouched_half_height = 0.5;
+    let skin_depth = 0.01;
+    let collider_radius = 0.25;
+
     let jump_delta_v = 7.5; // 7.5
     let acceleration_due_to_gravity = 2.0 * 9.8; // 2 * 9.8
 
     let (mut player_transform, mut player) = player_query.iter_mut().last().unwrap();
+
+    // Determine crouch / uncrouch
+    if !player.is_crouched && player_input.crouch_requested {
+        player.is_crouched = true;
+    } else if player.is_crouched && !player_input.crouch_requested {
+        player.is_crouched = false;
+        // Ensure there is space to stand up!
+        let shape = Collider::capsule_y(player_standing_half_height - skin_depth - collider_radius, collider_radius);
+        rapier_context.intersections_with_shape(
+            player_transform.translation + player_standing_half_height * Vec3::Y,
+            Quat::IDENTITY,
+            &shape,
+            QueryFilter::default(),
+            |_| {
+                player.is_crouched = true;
+                false
+            }
+        );
+    }
+    // If we want crouch jump will need to move the transform when in air
+    let half_player_height = match player.is_crouched { false =>  player_standing_half_height, true => player_crouched_half_height };
+    let shape = Collider::capsule_y(half_player_height - skin_depth - collider_radius, collider_radius);
 
     let local_x = player_transform.local_x();
     let local_z = player_transform.local_z();
@@ -68,11 +98,6 @@ fn move_player(
     let local_z = Vec3::new(local_z.x, 0.0, local_z.z).normalize();
 
     let time_delta = time.delta_seconds();
-
-    let skin_depth = 0.01;
-    let half_player_height = match player_input.crouch_requested { false =>  1.0, true => 0.5 };
-    let collider_radius = 0.25;
-    let shape = Collider::capsule_y(half_player_height - skin_depth - collider_radius, collider_radius);
 
     let mut collision_disabled = false;
 
@@ -314,10 +339,10 @@ fn update_look(
     time: Res<Time>,
     player_input: Res<PlayerInput>,
     mut camera_query: Query<(&mut Transform, &mut PlayerCamera), Without<Player>>,
-    mut player_query: Query<(&mut Transform, &Children), With<Player>>,
+    mut player_query: Query<(&mut Transform, &Children, &Player)>,
 ) {
     let rotation_speed = 0.1; // TODO: degrees = dots * 0.022
-    if let Some((mut player_transform, children)) = player_query.iter_mut().last() {
+    if let Some((mut player_transform, children, player)) = player_query.iter_mut().last() {
         for &child in children.iter() {
             if let Ok((mut camera_transform, mut player_camera)) = camera_query.get_mut(child) {
                 // prevent rotation past 10 degrees towards vertical
@@ -339,7 +364,7 @@ fn update_look(
                 camera_transform.rotation = Quat::IDENTITY;
                 camera_transform.rotate_axis(local_x, pitch);
 
-                if player_input.crouch_requested {
+                if player.is_crouched {
                     camera_transform.translation.y = 0.75;
                 } else {
                     camera_transform.translation.y = 1.25;
