@@ -158,6 +158,9 @@ fn build_controller_test_vorld() -> Vorld {
     fill(&mut world, BlockIds::StoneBlocks as u8, 4, 4, 1, x_offset - 1, 0, z_offset + 8);
     fill(&mut world, BlockIds::Air as u8, 2, 3, 1, x_offset, 0, z_offset + 8);
 
+    // Crouch jump test
+    fill(&mut world, BlockIds::StoneBlocks as u8, 3, 3, 1, x_offset - 5, 0, z_offset);
+    fill(&mut world, BlockIds::Air as u8, 1, 1, 1, x_offset - 4, 1, z_offset);
 
     world
 }

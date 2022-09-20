@@ -86,7 +86,6 @@ fn move_player(
             }
         );
     }
-    // If we want crouch jump will need to move the transform when in air
     let half_player_height = match player.is_crouched { false =>  player_standing_half_height, true => player_crouched_half_height };
     let shape = Collider::capsule_y(half_player_height - skin_depth - collider_radius, collider_radius);
 
