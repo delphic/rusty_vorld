@@ -4,13 +4,15 @@ use bevy_rapier3d::prelude::*;
 use super::lifetime::*;
 use super::named_collision_groups::*;
 use super::input::PlayerInput;
-use super::player::PlayerCamera;
 use super::projectile::Projectile;
 
 pub struct BulletMeshMaterial {
     mesh: Handle<Mesh>,
     material: Handle<StandardMaterial>
 }
+
+#[derive(Component)]
+pub struct Muzzle;
 
 pub fn setup(
     mut commands: Commands,
@@ -30,7 +32,7 @@ pub fn shoot(
     mut commands: Commands,
     bullet_assets: Res<BulletMeshMaterial>,
     mut player_input: ResMut<PlayerInput>,
-    transform_query: Query<&GlobalTransform, With<PlayerCamera>>, // TODO: Gun barrel component
+    transform_query: Query<&GlobalTransform, With<Muzzle>>,
 ) {
     
     if player_input.shoot_requested {
@@ -48,7 +50,7 @@ pub fn shoot(
                 .insert(RigidBody::Dynamic)
                 .insert(Ccd::enabled())
                 .insert(Velocity {
-                    linvel: 100.0 * global_transform.forward(),
+                    linvel: 500.0 * global_transform.forward(),
                     angvel: Vec3::ZERO,
                 })
                 .insert(Collider::ball(0.01))

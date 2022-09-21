@@ -1,6 +1,7 @@
 use bevy::prelude::*;
 use bevy_rapier3d::prelude::*;
 
+use super::gun;
 use super::input::PlayerInput;
 use super::named_collision_groups::*;
 use super::utils;
@@ -26,7 +27,10 @@ pub fn add_systems(app: &mut App) {
         .add_system(move_player);
 }
 
-fn setup(mut commands: Commands) {
+fn setup(
+    mut commands: Commands,
+    asset_server: Res<AssetServer>,
+) {
     commands
         .spawn()
         .insert_bundle(SpatialBundle { transform: Transform::from_xyz(8.0, 1.0, -8.0), ..default() })
@@ -35,13 +39,20 @@ fn setup(mut commands: Commands) {
             is_grounded: false,
             is_crouched: false,
         }).with_children(|child_builder| {
-            child_builder.spawn_bundle(Camera3dBundle { 
-                transform: Transform::from_xyz(0.0, 1.25, 0.0),
-                ..default()
-            }).insert(PlayerCamera {
-                pitch: 0.0,
-                yaw: std::f32::consts::PI,
-            });
+            child_builder.spawn_bundle(SpatialBundle::default())
+                .insert_bundle(Camera3dBundle { 
+                    transform: Transform::from_xyz(0.0, 1.25, 0.0),
+                    ..default()
+                }).insert(PlayerCamera {
+                    pitch: 0.0,
+                    yaw: std::f32::consts::PI,
+                }).with_children(|child_builder| {
+                    child_builder.spawn_bundle(SceneBundle {
+                        scene: asset_server.load("models/rifle.gltf#Scene0"),
+                        transform: Transform::from_xyz(0.125, -0.125, -0.25),
+                        ..default()
+                    }).insert(gun::Muzzle); // Ideally would get the muzzle transform position from the loaded model
+                });
         });
 }
 

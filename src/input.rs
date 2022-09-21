@@ -25,6 +25,7 @@ pub fn add_systems(app: &mut App) {
 fn detect_player_input(
     game_state: Res<crate::GameState>,
     keyboard_input: Res<Input<KeyCode>>,
+    mouse_button_input: Res<Input<MouseButton>>,
     mut player_input: ResMut<PlayerInput>,
     mut mouse_motion_events: EventReader<MouseMotion>,
 ) {
@@ -60,5 +61,5 @@ fn detect_player_input(
 
     player_input.jump_requested = player_input.jump_requested || keyboard_input.just_pressed(KeyCode::Space);
     player_input.crouch_requested = keyboard_input.pressed(KeyCode::LControl);
-    player_input.shoot_requested = player_input.shoot_requested || keyboard_input.just_pressed(KeyCode::E); // TODO: Mouse input
+    player_input.shoot_requested = player_input.shoot_requested || mouse_button_input.just_pressed(MouseButton::Left);
 }
