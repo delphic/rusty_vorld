@@ -10,6 +10,7 @@ mod mesher;
 mod named_collision_groups;
 mod npc_spawner;
 mod player;
+mod projectile;
 mod scene_spawner;
 mod utils;
 mod voxel;
@@ -35,7 +36,7 @@ impl Plugin for VorldPlugin {
         atlas_loader::init(app);
         voxel::init(app);
         input::insert_resources(app);
-
+        app.add_event::<projectile::ProjectileImpactEvent>();
         app.add_startup_system(npc_spawner::setup);
         app.add_system(npc_spawner::handle_asset_load);
         app.add_startup_system(scene_spawner::spawn_lighting);
@@ -46,7 +47,8 @@ impl Plugin for VorldPlugin {
         player::add_systems(app);
         
         app.add_system(gun::shoot);
-        app.add_system(gun::projectile_impact);
+        app.add_system(projectile::detect_projectile_impact);
+        app.add_system(health::handle_projectile_impact.after(projectile::detect_projectile_impact));
         app.add_system(lifetime::update);
 
         app.add_system(zombie::seek_brains);

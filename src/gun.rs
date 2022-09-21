@@ -1,21 +1,15 @@
 use bevy::prelude::*;
 use bevy_rapier3d::prelude::*;
 
-use super::health::Health;
-use super::input::PlayerInput;
 use super::lifetime::*;
 use super::named_collision_groups::*;
+use super::input::PlayerInput;
 use super::player::PlayerCamera;
-use super::zombie::Zombie;
+use super::projectile::Projectile;
 
 pub struct BulletMeshMaterial {
     mesh: Handle<Mesh>,
     material: Handle<StandardMaterial>
-}
-
-#[derive(Component)]
-pub struct Projectile {
-    damage: u32,
 }
 
 pub fn setup(
@@ -65,44 +59,3 @@ pub fn shoot(
     }
 }
 
-pub fn projectile_impact(
-    mut commands: Commands,
-    mut collision_events: EventReader<CollisionEvent>,
-    projectile_query: Query<&Projectile>,
-    collider_parent_query: Query<&Parent, With<Collider>>,
-    mut health_query: Query<(Entity, &mut Health), With<Zombie>>,
-) {
-    for collision in collision_events.iter() {
-        match collision {
-            CollisionEvent::Started(entity1, entity2, _event_flags) => {
-                if let Ok(projectile) = projectile_query.get(*entity1) {
-                    handle_collision(&mut commands, entity1, entity2, projectile, &collider_parent_query, &mut health_query);
-                } else if let Ok(projectile) = projectile_query.get(*entity2) {
-                    handle_collision(&mut commands, entity2, entity1, projectile, &collider_parent_query, &mut health_query)
-                }
-            },
-            _ => { }
-        }
-    }
-}
-
-fn handle_collision(
-    commands: &mut Commands,
-    projectile_entity: &Entity,
-    hit_entity: &Entity,
-    projectile: &Projectile,
-    collider_parent_query: &Query<&Parent, With<Collider>>,
-    health_query: &mut Query<(Entity, &mut Health), With<Zombie>>,
-) {
-    // Try to get the hit parent
-    if let Ok(parent) = collider_parent_query.get(*hit_entity) {
-        if let Ok((entity, mut health)) = health_query.get_mut(parent.get()) {
-            health.current_health -= projectile.damage.min(health.current_health);
-
-            if health.current_health <= 0 { // TODO: Move to separate kill system
-                commands.entity(entity).despawn_recursive();
-            }
-        }
-    }
-    commands.entity(*projectile_entity).despawn();
-}
