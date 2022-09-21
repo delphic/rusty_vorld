@@ -2,12 +2,18 @@ use bevy::prelude::*;
 use bevy_rapier3d::prelude::*;
 
 mod atlas_loader;
+mod gun;
+mod health;
 mod input;
+mod lifetime;
 mod mesher;
+mod named_collision_groups;
+mod npc_spawner;
 mod player;
 mod scene_spawner;
 mod utils;
 mod voxel;
+mod zombie;
 
 fn main() {
     App::new()
@@ -30,11 +36,20 @@ impl Plugin for VorldPlugin {
         voxel::init(app);
         input::insert_resources(app);
 
+        app.add_startup_system(npc_spawner::setup);
+        app.add_system(npc_spawner::handle_asset_load);
         app.add_startup_system(scene_spawner::spawn_lighting);
+        app.add_startup_system(gun::setup);
 
         app.add_system(grab_mouse);
         input::add_systems(app);
         player::add_systems(app);
+        
+        app.add_system(gun::shoot);
+        app.add_system(gun::projectile_impact);
+        app.add_system(lifetime::update);
+
+        app.add_system(zombie::seek_brains);
     }
 }
 

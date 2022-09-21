@@ -2,17 +2,18 @@ use bevy::prelude::*;
 use bevy_rapier3d::prelude::*;
 
 use super::input::PlayerInput;
+use super::named_collision_groups::*;
 use super::utils;
 
 #[derive(Component)]
-struct Player {
+pub struct Player {
     velocity: Vec3,
     is_grounded: bool,
     is_crouched: bool,
 }
 
 #[derive(Component)]
-struct PlayerCamera {
+pub struct PlayerCamera {
     /// The desired angle around the local x axis, -π/2 -> π/2
     pitch: f32,
     /// The desired angle around the global y axis, 0 -> 2π
@@ -69,6 +70,10 @@ fn move_player(
 
     let (mut player_transform, mut player) = player_query.iter_mut().last().unwrap();
 
+    let terrain_filter = QueryFilter::only_fixed().groups(InteractionGroups::new(NamedCollisionGroups::Everything as u32, NamedCollisionGroups::Terrain as u32));
+
+    // TODO: Query Filter for terrain
+
     // Determine crouch / uncrouch
     if !player.is_crouched && player_input.crouch_requested {
         player.is_crouched = true;
@@ -80,7 +85,7 @@ fn move_player(
             player_transform.translation + player_standing_half_height * Vec3::Y,
             Quat::IDENTITY,
             &shape,
-            QueryFilter::default(),
+            terrain_filter,
             |_| {
                 player.is_crouched = true;
                 false
@@ -189,7 +194,7 @@ fn move_player(
     }
 
     let start_translation = player_transform.translation;
-
+    // Character Controller Move
     if target_velocity.length_squared() > 0.0 {
         let velocity_direction = target_velocity.normalize();
         let velocity_magnitude = target_velocity.length();
@@ -200,7 +205,7 @@ fn move_player(
             velocity_direction,
             &shape,
             time_delta * velocity_magnitude + skin_depth,
-            QueryFilter::default(),
+            terrain_filter,
         ) {
             if hit.toi == 0.0 {
                 // Already overlapping - should only happen if teleported or spawned inside collider
@@ -228,7 +233,7 @@ fn move_player(
                     slide_velocity_direction,
                     &shape,
                     time_remainder * slide_velocity_magnitude + skin_depth,
-                    QueryFilter::default(),
+                    terrain_filter,
                 ) {
                     // slide also collides, attempt to one further slide in direction perpenticular to both hit normals
                     let second_slide_direction = hit.normal1.cross(second_hit.normal1);
@@ -270,7 +275,7 @@ fn move_player(
                 player_transform.translation + half_player_height * Vec3::Y,
                 Quat::IDENTITY,
                 &shape,
-                QueryFilter::default(),
+                terrain_filter,
                 |_| {
                     // cast_shape sometimes lies about there being no collision due to float precision issues,
                     // so check for intersections and if found restore to starting position
@@ -300,6 +305,7 @@ fn move_player(
         false => Vec3::NEG_Y,
     };
 
+    // Character Controller Move - again!
     if vertical_velocity.abs() > 0.0 {
         let reset_position = player_transform.translation;
         if let Some((_, hit)) = rapier_context.cast_shape(
@@ -308,7 +314,7 @@ fn move_player(
             direction,
             &shape,
             time_delta * vertical_velocity.abs() + skin_depth,
-            QueryFilter::default(),
+            terrain_filter,
         ) {
             let close_distance = hit.toi - skin_depth;
             player_transform.translation += direction * close_distance;
@@ -323,7 +329,7 @@ fn move_player(
                 player_transform.translation + half_player_height * Vec3::Y,
                 Quat::IDENTITY,
                 &shape,
-                QueryFilter::default(),
+                terrain_filter,
                 |_| {
                     // cast_shape sometimes lies about there being no collision due to float precision issues,
                     // so check for intersections and if found restore to starting position 

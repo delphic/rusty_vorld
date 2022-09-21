@@ -1,6 +1,6 @@
 # Rusty Vorld
 
-A WIP first person exploration / traversal puzzle game built in bevy.
+A test bed for FPS games in bevy.
 
 ## Web Build
 

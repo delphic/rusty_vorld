@@ -1,5 +1,6 @@
 use super::atlas_loader::AtlasTexture;
 use super::mesher;
+use super::named_collision_groups::*;
 use bevy::prelude::*;
 use bevy::tasks::{AsyncComputeTaskPool, Task};
 use bevy_rapier3d::prelude::*;
@@ -47,7 +48,7 @@ pub fn init(app: &mut App) {
 struct ComputeChunkMeshes(Task<(IVec3, Vec<(u32, Mesh)>)>);
 
 pub fn setup(mut commands: Commands, voxel_config: Res<VoxelConfig>) {
-    let world = build_controller_test_vorld();
+    let world = build_test_arena_vorld();
     async_instantiate_world(&mut commands, &world, &voxel_config)
 }
 
@@ -165,6 +166,26 @@ fn build_controller_test_vorld() -> Vorld {
     world
 }
 
+#[allow(dead_code)]
+fn build_test_arena_vorld() -> Vorld {
+    let mut world = Vorld {
+        chunks: HashMap::new()
+    };
+
+    for z in -32..32 {
+        for x in -32..32 {
+            world.add_voxel(BlockIds::Stone as u8, x, -1, z);
+            if x == -32 || z == -32 || x == 31 || z == 31 {
+                for y in 0..2 {
+                    world.add_voxel(BlockIds::StoneBlocks as u8, x, y, z);
+                }
+            } 
+        }
+    }
+
+    world
+}
+
 fn fill(world: &mut Vorld, block: u8, width: i32, height: i32, depth: i32, x: i32 , y: i32, z: i32) {
     for j in 0..height {
         for k in 0..depth {
@@ -220,7 +241,12 @@ fn handle_meshing_tasks(
                 if let Some(collider) =
                     Collider::from_bevy_mesh(&mesh, &ComputedColliderShape::TriMesh)
                 {
-                    entity_commands.insert(collider);
+                    entity_commands
+                        .insert(collider)
+                        .insert(CollisionGroups::new(
+                            NamedCollisionGroups::Terrain as u32,
+                            NamedCollisionGroups::Everything as u32,
+                        ));
                 } else {
                     error!("Unable to generate mesh collider");
                 }

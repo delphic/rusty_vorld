@@ -1,5 +1,6 @@
 use bevy::prelude::*;
 use bevy_rapier3d::prelude::*;
+use super::named_collision_groups::*;
 
 pub fn spawn_lighting(mut commands: Commands) {
     commands.insert_resource(AmbientLight::default());
@@ -65,6 +66,7 @@ pub fn spawn_test(
                 transform: Transform::from_xyz(8.0 * (i as f32 - 1.5), 0.5, -8.0),
                 ..default()
             })
-            .insert(Collider::cuboid(0.5, 0.5, 0.5));
+            .insert(Collider::cuboid(0.5, 0.5, 0.5))
+            .insert(CollisionGroups::new(NamedCollisionGroups::Terrain as u32, NamedCollisionGroups::Everything as u32));
     }
 }
