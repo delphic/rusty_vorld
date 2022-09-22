@@ -83,8 +83,6 @@ fn move_player(
 
     let terrain_filter = QueryFilter::only_fixed().groups(InteractionGroups::new(NamedCollisionGroups::Everything as u32, NamedCollisionGroups::Terrain as u32));
 
-    // TODO: Query Filter for terrain
-
     // Determine crouch / uncrouch
     if !player.is_crouched && player_input.crouch_requested {
         player.is_crouched = true;
@@ -198,7 +196,7 @@ fn move_player(
             let redirect_threshold_speed_sqr = (max_run_speed * max_run_speed).max(max_air_movement_speed_sqr);
             let current_air_speed_sqr = target_velocity.length_squared(); 
             if current_air_speed_sqr < redirect_threshold_speed_sqr {
-            // allow redirection of the direction of air movement if below redirect threshold
+                // allow redirection of the direction of air movement if below redirect threshold
                 target_velocity = (current_air_speed_sqr.sqrt() / target_air_speed_sqr.sqrt()) * Vec3::new(target_x, 0.0, target_z);
             }
         }
