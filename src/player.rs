@@ -21,8 +21,14 @@ pub struct PlayerCamera {
     yaw: f32,
 }
 
+#[derive(Component)]
+pub struct AttachMuzzleRequest {
+    entity: Entity
+}
+
 pub fn add_systems(app: &mut App) {
     app.add_startup_system(setup)
+        .add_system(attach_muzzle)
         .add_system(update_look)
         .add_system(move_player);
 }
@@ -31,6 +37,7 @@ fn setup(
     mut commands: Commands,
     asset_server: Res<AssetServer>,
 ) {
+    let mut model_entity = None;
     commands
         .spawn()
         .insert_bundle(SpatialBundle { transform: Transform::from_xyz(8.0, 1.0, -8.0), ..default() })
@@ -47,13 +54,35 @@ fn setup(
                     pitch: 0.0,
                     yaw: std::f32::consts::PI,
                 }).with_children(|child_builder| {
-                    child_builder.spawn_bundle(SceneBundle {
+                    let entity = child_builder.spawn_bundle(SceneBundle {
                         scene: asset_server.load("models/rifle.gltf#Scene0"),
                         transform: Transform::from_xyz(0.125, -0.125, -0.25),
                         ..default()
-                    }).insert(gun::Muzzle); // Ideally would get the muzzle transform position from the loaded model
+                    }).id();
+                    model_entity = Some(entity);
                 });
         });
+    if let Some(entity) = model_entity {
+        commands.spawn().insert(AttachMuzzleRequest { entity });
+    }
+}
+
+fn attach_muzzle(
+    mut commands: Commands,
+    request_query: Query<(Entity, &AttachMuzzleRequest)>,
+    traversal_query: Query<(&Children, Option<&Name>)>,
+) {
+    for (entity, request) in request_query.iter() {
+        if let Ok((children, _)) = traversal_query.get(request.entity) {
+            if let Some(muzzle_entity) = utils::find_child_with_name("muzzle", children, &traversal_query) {
+                commands.entity(muzzle_entity).insert(gun::Muzzle);
+            } else {
+                warn!("Unable to find child entity with name muzzle, attaching to root");
+                commands.entity(request.entity).insert(gun::Muzzle);
+            }
+            commands.entity(entity).despawn();
+        }
+    }
 }
 
 fn move_player(
