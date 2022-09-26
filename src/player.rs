@@ -4,6 +4,7 @@ use bevy_rapier3d::prelude::*;
 use super::gun;
 use super::input::PlayerInput;
 use super::named_collision_groups::*;
+use super::smoothed_follow::SmoothedFollow;
 use super::utils;
 
 #[derive(Component)]
@@ -15,6 +16,8 @@ pub struct Player {
 
 #[derive(Component)]
 pub struct PlayerCamera {
+    target: Entity,
+    offset: Vec3,
     /// The desired angle around the local x axis, -π/2 -> π/2
     pitch: f32,
     /// The desired angle around the global y axis, 0 -> 2π
@@ -29,42 +32,50 @@ pub struct AttachMuzzleRequest {
 pub fn add_systems(app: &mut App) {
     app.add_startup_system(setup)
         .add_system(attach_muzzle)
-        .add_system(update_look)
-        .add_system(move_player);
+        .add_system(move_player)
+        .add_system(update_look.after(move_player));
 }
 
 fn setup(
     mut commands: Commands,
     asset_server: Res<AssetServer>,
 ) {
-    let mut model_entity = None;
-    commands
+    let player_spawn_point = Vec3::new(8.0, 1.0, -8.0);
+    let camera_offset = Vec3::new(0.0, 1.25, 0.0);
+
+    let player_entity =  commands
         .spawn()
-        .insert_bundle(SpatialBundle { transform: Transform::from_xyz(8.0, 1.0, -8.0), ..default() })
+        .insert_bundle(SpatialBundle { transform: Transform::identity().with_translation(player_spawn_point), ..default() })
         .insert(Player {
             velocity: Vec3::ZERO,
             is_grounded: false,
             is_crouched: false,
-        }).with_children(|child_builder| {
-            child_builder.spawn_bundle(SpatialBundle::default())
-                .insert_bundle(Camera3dBundle { 
-                    transform: Transform::from_xyz(0.0, 1.25, 0.0),
-                    ..default()
-                }).insert(PlayerCamera {
-                    pitch: 0.0,
-                    yaw: std::f32::consts::PI,
-                }).with_children(|child_builder| {
-                    let entity = child_builder.spawn_bundle(SceneBundle {
-                        scene: asset_server.load("models/rifle.gltf#Scene0"),
-                        transform: Transform::from_xyz(0.125, -0.125, -0.25),
-                        ..default()
-                    }).id();
-                    model_entity = Some(entity);
-                });
-        });
-    if let Some(entity) = model_entity {
-        commands.spawn().insert(AttachMuzzleRequest { entity });
-    }
+        }).id();
+    
+    let camera_entity = commands.spawn_bundle(SpatialBundle::default())
+        .insert_bundle(Camera3dBundle { 
+            transform: Transform::identity().with_translation(player_spawn_point + camera_offset),
+            ..default()
+        }).insert(PlayerCamera {
+            target: player_entity,
+            offset: camera_offset,
+            pitch: 0.0,
+            yaw: std::f32::consts::PI,
+        }).id();
+    
+    let gun_pivot = Vec3::new(0.125, -0.125, -0.25);
+    let model_entity = commands.spawn_bundle(SceneBundle {
+        scene: asset_server.load("models/rifle.gltf#Scene0"),
+        transform: Transform::identity().with_translation(player_spawn_point + camera_offset + gun_pivot),
+        ..default()
+    }).insert(SmoothedFollow {
+        target: camera_entity,
+        translation_offset: gun_pivot,
+        translation_rate: 0.9,
+        rotation_rate: 0.5,
+    }).id();
+    
+    commands.spawn().insert(AttachMuzzleRequest { entity: model_entity });
 }
 
 fn attach_muzzle(
@@ -383,44 +394,45 @@ fn move_player(
     player.velocity = (player_transform.translation - start_translation) / time_delta;
 }
 
-fn update_look(
+pub fn update_look(
     time: Res<Time>,
     player_input: Res<PlayerInput>,
     mut camera_query: Query<(&mut Transform, &mut PlayerCamera), Without<Player>>,
-    mut player_query: Query<(&mut Transform, &Children, &Player)>,
+    mut player_query: Query<(&mut Transform, &Player)>,
 ) {
     let rotation_speed = 0.1; // TODO: degrees = dots * 0.022
-    if let Some((mut player_transform, children, player)) = player_query.iter_mut().last() {
-        for &child in children.iter() {
-            if let Ok((mut camera_transform, mut player_camera)) = camera_query.get_mut(child) {
-                // prevent rotation past 10 degrees towards vertical
-                let clamp_angle = std::f32::consts::PI * (0.5 - 10.0 / 180.0);
-                    
-                let scaled_mouse_delta = rotation_speed * time.delta_seconds() * player_input.mouse_motion;
 
-                let yaw = (player_camera.yaw - scaled_mouse_delta.x) % (2.0 * std::f32::consts::PI);
-                let pitch = utils::clamp(
-                    player_camera.pitch - scaled_mouse_delta.y,
-                    -clamp_angle,
-                    clamp_angle,
-                );
+    for (mut camera_transform, mut player_camera) in camera_query.iter_mut() {
+        if let Ok((mut player_transform, player)) = player_query.get_mut(player_camera.target) {
+            // prevent rotation past 10 degrees towards vertical
+            let clamp_angle = std::f32::consts::PI * (0.5 - 10.0 / 180.0);
 
-                player_transform.rotation = Quat::IDENTITY;
-                player_transform.rotate_axis(Vec3::Y, yaw);
+            let scaled_mouse_delta = rotation_speed * time.delta_seconds() * player_input.mouse_motion;
 
-                let local_x = camera_transform.local_x();
-                camera_transform.rotation = Quat::IDENTITY;
-                camera_transform.rotate_axis(local_x, pitch);
+            let yaw = (player_camera.yaw - scaled_mouse_delta.x) % (2.0 * std::f32::consts::PI);
+            let pitch = utils::clamp(
+                player_camera.pitch - scaled_mouse_delta.y,
+                -clamp_angle,
+                clamp_angle,
+            );
 
-                if player.is_crouched {
-                    camera_transform.translation.y = 0.75;
-                } else {
-                    camera_transform.translation.y = 1.25;
-                }
+            player_transform.rotation = Quat::IDENTITY;
+            player_transform.rotate_axis(Vec3::Y, yaw);
 
-                player_camera.yaw = yaw;
-                player_camera.pitch = pitch;
+            camera_transform.rotation = Quat::IDENTITY;
+            camera_transform.rotate_axis(Vec3::Y, yaw);
+            let local_x = camera_transform.local_x();
+            camera_transform.rotate_axis(local_x, pitch);
+
+            if player.is_crouched {
+                player_camera.offset.y = 0.75;
+            } else {
+                player_camera.offset.y = 1.25;
             }
+            camera_transform.translation = player_transform.translation + player_camera.offset;
+
+            player_camera.yaw = yaw;
+            player_camera.pitch = pitch;
         }
     }
 }

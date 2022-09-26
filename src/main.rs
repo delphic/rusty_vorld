@@ -12,6 +12,7 @@ mod npc_spawner;
 mod player;
 mod projectile;
 mod scene_spawner;
+mod smoothed_follow;
 mod utils;
 mod voxel;
 mod zombie;
@@ -50,6 +51,7 @@ impl Plugin for VorldPlugin {
         app.add_system(projectile::detect_projectile_impact);
         app.add_system(health::handle_projectile_impact.after(projectile::detect_projectile_impact));
         app.add_system(lifetime::update);
+        app.add_system(smoothed_follow::follow.after(player::update_look));
 
         app.add_system(zombie::seek_brains);
     }
