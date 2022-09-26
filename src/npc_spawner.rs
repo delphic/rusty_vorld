@@ -4,12 +4,21 @@ use bevy_rapier3d::prelude::*;
 use super::health::Health;
 use super::named_collision_groups::*;
 use super::zombie::Zombie;
+use super::utils;
 
 pub struct NpcAssets {
     is_loaded: bool,
     tiny_person: Handle<Scene>,
     pub walk_animation: Handle<AnimationClip>,
 }
+
+#[derive(Component)]
+pub struct Npc {
+    pub animation_player_entity: Option<Entity>,
+}
+
+#[derive(Component)]
+pub struct FindAnimationPlayerRequest;
 
 pub fn setup(
     mut commands: Commands,
@@ -40,8 +49,9 @@ pub fn handle_asset_load(
                     transform: Transform::from_xyz(x as f32, 0.0, 0.0),
                     ..default()
                     })
+                    .insert(Npc { animation_player_entity: None })
+                    .insert(FindAnimationPlayerRequest)
                     .insert(Zombie::new())
-                    .insert(super::zombie::FindAnimationPlayerRequest)
                     .insert(Health { max_health: 10, current_health: 10 })
                     .with_children(|child_builder| {
                         // Should probably attempt to get the collision information out of the model, for now, hard code
@@ -52,5 +62,18 @@ pub fn handle_asset_load(
                     });
             }
         }
+    }
+}
+
+pub fn handle_find_animation_player_request(
+    mut commands: Commands, 
+    mut request_query: Query<(Entity, &mut Npc), With<FindAnimationPlayerRequest>>,
+    hierarchy_query: Query<(&Children, Option<&AnimationPlayer>)>,
+) {
+    for (entity, mut npc) in request_query.iter_mut() {
+        if let Ok((children, _)) = hierarchy_query.get(entity) {
+            npc.animation_player_entity = utils::find_child_entity_with_component(children, &hierarchy_query);
+        }
+        commands.entity(entity).remove::<FindAnimationPlayerRequest>();
     }
 }

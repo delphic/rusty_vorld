@@ -40,6 +40,7 @@ impl Plugin for VorldPlugin {
         app.add_event::<projectile::ProjectileImpactEvent>();
         app.add_startup_system(npc_spawner::setup);
         app.add_system(npc_spawner::handle_asset_load);
+        app.add_system(npc_spawner::handle_find_animation_player_request);
         app.add_startup_system(scene_spawner::spawn_lighting);
         app.add_startup_system(gun::setup);
 
@@ -53,7 +54,6 @@ impl Plugin for VorldPlugin {
         app.add_system(lifetime::update);
         app.add_system(smoothed_follow::follow.after(player::update_look));
 
-        app.add_system(zombie::handle_find_animation_player_request);
         app.add_system(zombie::seek_brains);
     }
 }
