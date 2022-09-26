@@ -30,3 +30,22 @@ pub fn find_child_with_name(
     }
     return None;
 }
+
+pub fn find_child_entity_with_component<T: Component>(
+    children: &Children,
+    hierarchy_query: &Query<(&Children, Option<&T>)>
+) -> Option<Entity> {
+    for child in children {
+        if let Ok((children, animation_player_option)) = hierarchy_query.get(*child) {
+            if animation_player_option.is_some() {
+                return Some(child.clone());
+            } else {
+                let result = find_child_entity_with_component(children, hierarchy_query);
+                if result.is_some() {
+                    return result;
+                }
+            }
+        }
+    }
+    return None;
+}

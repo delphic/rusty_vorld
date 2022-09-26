@@ -53,6 +53,7 @@ impl Plugin for VorldPlugin {
         app.add_system(lifetime::update);
         app.add_system(smoothed_follow::follow.after(player::update_look));
 
+        app.add_system(zombie::handle_find_animation_player_request);
         app.add_system(zombie::seek_brains);
     }
 }
