@@ -1,6 +1,7 @@
 use bevy::prelude::*;
 use bevy_rapier3d::prelude::*;
 
+use super::hit_flash::HitFlashSupport;
 use super::health::Health;
 use super::named_collision_groups::*;
 use super::zombie::Zombie;
@@ -37,6 +38,8 @@ pub fn setup(
 pub fn handle_asset_load(
     mut commands: Commands,
     mut npc_assets: ResMut<NpcAssets>,
+    mut meshes: ResMut<Assets<Mesh>>,
+    mut materials: ResMut<Assets<StandardMaterial>>,
     scenes: Res<Assets<Scene>>,
 ) {
     if !npc_assets.is_loaded {
@@ -45,14 +48,14 @@ pub fn handle_asset_load(
             for x in -4..=4 {
                 commands
                     .spawn_bundle(SceneBundle {
-                    scene: npc_assets.tiny_person.clone(),
-                    transform: Transform::from_xyz(x as f32, 0.0, 0.0),
-                    ..default()
+                        scene: npc_assets.tiny_person.clone(),
+                        transform: Transform::from_xyz(x as f32, 0.0, 0.0),
+                        ..default()
                     })
                     .insert(Npc { animation_player_entity: None })
                     .insert(FindAnimationPlayerRequest)
                     .insert(Zombie::new())
-                    .insert(Health { max_health: 10, current_health: 10 })
+                    .insert(Health::new(10))
                     .with_children(|child_builder| {
                         // Should probably attempt to get the collision information out of the model, for now, hard code
                         child_builder
@@ -61,6 +64,25 @@ pub fn handle_asset_load(
                             .insert(CollisionGroups::new(NamedCollisionGroups::Npc as u32, NamedCollisionGroups::Everything as u32));
                     });
             }
+
+            let cube_mesh = meshes.add(Mesh::from(shape::Cube { size: 1.0 }));
+            let blue = Color::rgb_u8(0, 40, 90);
+            let cube_material = materials.add(blue.into());
+            commands
+                .spawn_bundle(PbrBundle {
+                    mesh: cube_mesh.clone(),
+                    material: cube_material.clone(),
+                    transform: Transform::from_xyz(8.0, 0.5, 8.0),
+                    ..default()
+                })
+                .insert(Npc { animation_player_entity: None })
+                .insert(Health { max_health: 100, current_health: 100 })
+                .insert(HitFlashSupport { material: cube_material.clone(), base_color: blue, flash_color: Color::RED  })
+                .with_children(|child_builder| {
+                    child_builder.spawn_bundle(SpatialBundle { ..default() })
+                       .insert(Collider::cuboid(0.5, 0.5, 0.5))
+                       .insert(CollisionGroups::new(NamedCollisionGroups::Npc as u32, NamedCollisionGroups::Everything as u32));
+                });
         }
     }
 }

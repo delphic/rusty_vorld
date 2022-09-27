@@ -4,6 +4,7 @@ use bevy_rapier3d::prelude::*;
 mod atlas_loader;
 mod gun;
 mod health;
+mod hit_flash;
 mod input;
 mod lifetime;
 mod mesher;
@@ -38,6 +39,7 @@ impl Plugin for VorldPlugin {
         voxel::init(app);
         input::insert_resources(app);
         app.add_event::<projectile::ProjectileImpactEvent>();
+        app.add_event::<health::TakeDamageEvent>();
         app.add_startup_system(npc_spawner::setup);
         app.add_system(npc_spawner::handle_asset_load);
         app.add_system(npc_spawner::handle_find_animation_player_request);
@@ -53,6 +55,9 @@ impl Plugin for VorldPlugin {
         app.add_system(health::handle_projectile_impact.after(projectile::detect_projectile_impact));
         app.add_system(lifetime::update);
         app.add_system(smoothed_follow::follow.after(player::update_look));
+
+        app.add_system(hit_flash::update_hit_flash);
+        app.add_system(hit_flash::handle_take_damage_event);
 
         app.add_system(zombie::seek_brains);
     }
