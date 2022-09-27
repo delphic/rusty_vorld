@@ -11,7 +11,7 @@ pub struct SmoothedFollow {
 
 pub fn follow(
     mut follower_query: Query<(&SmoothedFollow, &mut Transform)>,
-    transform_query: Query<&Transform, Without<SmoothedFollow>>,
+    transform_query: Query<&Transform, Without<SmoothedFollow>>, // This might perform better if follow targets had a "FollowTarget" tag component (?)
 ) {
     for (smoothed_follow, mut transform) in follower_query.iter_mut() {
         if let Ok(target_transform) = transform_query.get(smoothed_follow.target) {

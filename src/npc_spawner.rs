@@ -143,7 +143,7 @@ pub fn handle_clone_model_materials_request(
                         });
 
                     // Replace the materials on the model with this clone
-                    // NOTE: Assumes single material model
+                    // NOTE: Assumes single material per model
                     for material_entity in material_entities.iter() {
                         commands.entity(*material_entity)
                             .remove::<Handle<StandardMaterial>>()
