@@ -78,11 +78,8 @@ pub fn handle_asset_load(
                 .insert(Npc { animation_player_entity: None })
                 .insert(Health { max_health: 100, current_health: 100 })
                 .insert(HitFlashSupport { material: cube_material.clone(), base_color: blue, flash_color: Color::RED  })
-                .with_children(|child_builder| {
-                    child_builder.spawn_bundle(SpatialBundle { ..default() })
-                       .insert(Collider::cuboid(0.5, 0.5, 0.5))
-                       .insert(CollisionGroups::new(NamedCollisionGroups::Npc as u32, NamedCollisionGroups::Everything as u32));
-                });
+                .insert(Collider::cuboid(0.5, 0.5, 0.5))
+                .insert(CollisionGroups::new(NamedCollisionGroups::Npc as u32, NamedCollisionGroups::Everything as u32));
         }
     }
 }
