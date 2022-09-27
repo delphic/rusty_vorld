@@ -43,6 +43,7 @@ impl Plugin for VorldPlugin {
         app.add_startup_system(npc_spawner::setup);
         app.add_system(npc_spawner::handle_asset_load);
         app.add_system(npc_spawner::handle_find_animation_player_request);
+        app.add_system(npc_spawner::handle_clone_model_materials_request);
         app.add_startup_system(scene_spawner::spawn_lighting);
         app.add_startup_system(gun::setup);
 

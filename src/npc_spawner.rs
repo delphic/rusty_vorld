@@ -21,6 +21,9 @@ pub struct Npc {
 #[derive(Component)]
 pub struct FindAnimationPlayerRequest;
 
+#[derive(Component)]
+pub struct CloneModelMaterialsRequest;
+
 pub fn setup(
     mut commands: Commands,
     asset_server: Res<AssetServer>,
@@ -54,6 +57,7 @@ pub fn handle_asset_load(
                     })
                     .insert(Npc { animation_player_entity: None })
                     .insert(FindAnimationPlayerRequest)
+                    .insert(CloneModelMaterialsRequest)
                     .insert(Zombie::new())
                     .insert(Health::new(10))
                     .with_children(|child_builder| {
@@ -88,11 +92,66 @@ pub fn handle_find_animation_player_request(
     mut commands: Commands, 
     mut request_query: Query<(Entity, &mut Npc), With<FindAnimationPlayerRequest>>,
     hierarchy_query: Query<(&Children, Option<&AnimationPlayer>)>,
+    animation_player_query: Query<&AnimationPlayer>,
 ) {
     for (entity, mut npc) in request_query.iter_mut() {
         if let Ok((children, _)) = hierarchy_query.get(entity) {
-            npc.animation_player_entity = utils::find_child_entity_with_component(children, &hierarchy_query);
+            npc.animation_player_entity = utils::find_child_entity_with_component(children, &hierarchy_query, &animation_player_query);
         }
         commands.entity(entity).remove::<FindAnimationPlayerRequest>();
+    }
+}
+
+pub fn handle_clone_model_materials_request(
+    mut commands: Commands, 
+    mut request_query: Query<Entity, With<CloneModelMaterialsRequest>>,
+    mut materials: ResMut<Assets<StandardMaterial>>,
+    hierarchy_query: Query<(&Children, Option<&Handle<StandardMaterial>>)>,
+    material_query: Query<&Handle<StandardMaterial>>,
+) {
+    for entity in request_query.iter_mut() {
+        if let Ok((children, _)) = hierarchy_query.get(entity) {
+            let mut material_entities = Vec::new();
+            utils::find_children_with_component(&mut material_entities, children, &hierarchy_query, &material_query);
+
+            if !material_entities.is_empty() {
+                let mut cloned_material_handle_option = None;
+                let mut base_color = Color::WHITE;
+
+                if let Some(material_entity) = material_entities.first() {
+                    if let Ok(material_handle) = material_query.get(*material_entity) {
+                        let mut cloned_material_option = None;
+                        if let Some(material) = materials.get(material_handle) {
+                            cloned_material_option = Some(material.clone());
+                            base_color = material.base_color;
+                        } else {
+                            warn!("Unable to find model material in assets resource")
+                        }
+
+                        if let Some(new_material) = cloned_material_option {
+                            cloned_material_handle_option = Some(materials.add(new_material));
+                        }
+                    }
+                }
+
+                if let Some(cloned_material_handle) = cloned_material_handle_option {
+                    commands.entity(entity)
+                        .insert(HitFlashSupport {
+                            material: cloned_material_handle.clone(),
+                            base_color: base_color,
+                            flash_color: Color::RED,
+                        });
+
+                    // Replace the materials on the model with this clone
+                    // NOTE: Assumes single material model
+                    for material_entity in material_entities.iter() {
+                        commands.entity(*material_entity)
+                            .remove::<Handle<StandardMaterial>>()
+                            .insert(cloned_material_handle.clone());
+                    }
+                }
+            }
+        }
+        commands.entity(entity).remove::<CloneModelMaterialsRequest>();
     }
 }
