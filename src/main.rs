@@ -1,4 +1,5 @@
 use bevy::prelude::*;
+use bevy_hanabi::*;
 use bevy_rapier3d::prelude::*;
 
 mod atlas_loader;
@@ -22,6 +23,7 @@ fn main() {
     App::new()
         .insert_resource(Msaa { samples: 4 })
         .add_plugins(DefaultPlugins)
+        .add_plugin(HanabiPlugin)
         .add_plugin(RapierPhysicsPlugin::<NoUserData>::default())
         //.add_plugin(RapierDebugRenderPlugin::default())
         .add_plugin(VorldPlugin)
@@ -52,6 +54,7 @@ impl Plugin for VorldPlugin {
         player::add_systems(app);
         
         app.add_system(gun::shoot);
+        app.add_startup_system(projectile::setup);
         app.add_system(projectile::detect_projectile_impact);
         app.add_system(health::handle_projectile_impact.after(projectile::detect_projectile_impact));
         app.add_system(lifetime::update);

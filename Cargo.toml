@@ -11,6 +11,7 @@ opt-level = 3
 
 [dependencies]
 bevy = "0.8.1"
+bevy_hanabi = "0.3.1"
 bevy_rapier3d = { version="0.16.2", features = ["debug-render" ] }
 wgpu = { version = "0.13.1", features = ["spirv"] } # Set to match bevy_render Cargo.toml
 futures-lite = "1.11.3"
