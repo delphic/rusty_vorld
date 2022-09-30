@@ -28,7 +28,7 @@ pub fn handle_projectile_impact(
     mut commands: Commands,
     mut projectile_event_reader: EventReader<ProjectileImpactEvent>,
     mut take_damage_event_writer: EventWriter<TakeDamageEvent>,
-    collider_parent_query: Query<Option<&Parent>, With<Collider>>, // Should probably not *require* the entity has a parent?
+    collider_parent_query: Query<Option<&Parent>, With<Collider>>,
     mut health_query: Query<(Entity, &mut Health)>,
 ) {
     for event in projectile_event_reader.iter() {
