@@ -17,10 +17,11 @@ pub fn setup(
     mut effect_assets: ResMut<Assets<EffectAsset>>,
 ) {
     let mut gradient = Gradient::new();
-    gradient.add_key(0.0, Vec4::new(0.0, 1.0, 1.0, 1.0));
-    gradient.add_key(1.0, Vec4::new(0.0, 1.0, 1.0, 0.0));
+    gradient.add_key(0.0, Vec4::new(1.0, 0.97, 0.65, 1.0));
+    gradient.add_key(0.75, Vec4::new(0.94, 0.17, 0.07, 0.75));
+    gradient.add_key(1.0, Vec4::new(0.94, 0.17, 0.07, 0.0));
 
-    let spawner = Spawner::once(30.0.into(), false);
+    let spawner = Spawner::once(40.0.into(), false);
     let effect_handle = effect_assets.add(EffectAsset {
             name: "Impact".into(),
             capacity: 32768,
@@ -28,9 +29,14 @@ pub fn setup(
             .. default()
         }.init(PositionSphereModifier {
             radius: 0.1,
-            speed: 0.2.into(),
+            speed: 1.2.into(),
             dimension: ShapeDimension::Surface,
             ..default()
+        }).init(ParticleLifetimeModifier {
+            lifetime: 0.25,
+        }).update(AccelModifier {
+            accel: Vec3::new(0.0, -3.0, 0.0),
+        }).render(BillboardModifier{
         }).render(SizeOverLifetimeModifier {
             gradient: Gradient::constant(Vec2::splat(0.05)),
         }).render(ColorOverLifetimeModifier { gradient }),
