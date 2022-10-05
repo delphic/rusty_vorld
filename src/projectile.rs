@@ -12,6 +12,10 @@ pub struct ProjectileImpactEvent {
     pub hit_entity: Entity,
 }
 
+pub struct ImpactEffects {
+    default_impact_effect: Entity,
+}
+
 pub struct ProjectilePlugin;
 
 impl Plugin for ProjectilePlugin {
@@ -52,44 +56,48 @@ fn setup(
         }).render(ColorOverLifetimeModifier { gradient }),
     );
 
-    commands.spawn_bundle(ParticleEffectBundle::new(effect_handle).with_spawner(spawner))
-        .insert(Name::new("impact effect"));
+    let default_impact_effect = commands.spawn_bundle(ParticleEffectBundle::new(effect_handle).with_spawner(spawner))
+        .insert(Name::new("impact effect")).id();
+
+    commands.insert_resource(ImpactEffects { default_impact_effect });
 }
 
 pub fn detect_projectile_impact(
     mut commands: Commands,
     mut collision_events: EventReader<CollisionEvent>,
+    impact_effects : Res<ImpactEffects>,
     projectile_query: Query<(&Projectile, &Transform)>,
     mut projectile_event_writer: EventWriter<ProjectileImpactEvent>,
     mut effect_query: Query<(&mut ParticleEffect, &mut Transform), Without<Projectile>>
 ) {
     for collision in collision_events.iter() {
-        let (mut effect, mut effect_transform) = effect_query.single_mut();
-        match collision {
-            CollisionEvent::Started(entity1, entity2, _event_flags) => {
-                if let Ok((projectile, projectile_transform)) = projectile_query.get(*entity1) {
-                    projectile_event_writer.send(ProjectileImpactEvent { 
-                        projectile: *projectile,
-                        hit_entity: *entity2,
-                    });
-
-                    effect_transform.translation = projectile_transform.translation;
-                    effect.maybe_spawner().unwrap().reset(); // As it's a once - reset spawns new particles
-
-                    commands.entity(*entity1).despawn();
-                } else if let Ok((projectile, projectile_transform)) = projectile_query.get(*entity2) {
-                    projectile_event_writer.send(ProjectileImpactEvent {
-                        projectile: *projectile,
-                        hit_entity: *entity1,
-                    });
-
-                    effect_transform.translation = projectile_transform.translation;
-                    effect.maybe_spawner().unwrap().reset(); // As it's a once - reset spawns new particles
-
-                    commands.entity(*entity2).despawn();
-                }
-            },
-            _ => { }
+        if let Ok((mut effect, mut effect_transform)) = effect_query.get_mut(impact_effects.default_impact_effect) {
+            match collision {
+                CollisionEvent::Started(entity1, entity2, _event_flags) => {
+                    if let Ok((projectile, projectile_transform)) = projectile_query.get(*entity1) {
+                        projectile_event_writer.send(ProjectileImpactEvent { 
+                            projectile: *projectile,
+                            hit_entity: *entity2,
+                        });
+    
+                        effect_transform.translation = projectile_transform.translation;
+                        effect.maybe_spawner().unwrap().reset(); // As it's a once - reset spawns new particles
+    
+                        commands.entity(*entity1).despawn();
+                    } else if let Ok((projectile, projectile_transform)) = projectile_query.get(*entity2) {
+                        projectile_event_writer.send(ProjectileImpactEvent {
+                            projectile: *projectile,
+                            hit_entity: *entity1,
+                        });
+    
+                        effect_transform.translation = projectile_transform.translation;
+                        effect.maybe_spawner().unwrap().reset(); // As it's a once - reset spawns new particles
+    
+                        commands.entity(*entity2).despawn();
+                    }
+                },
+                _ => { }
+            }
         }
     }
 }
