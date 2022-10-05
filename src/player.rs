@@ -29,6 +29,24 @@ pub struct AttachMuzzleRequest {
     entity: Entity
 }
 
+struct PlayerMovementConfig {
+    acceleration: f32,
+    air_acceleration: f32,
+    max_run_speed: f32,
+    max_air_movement_speed: f32,
+    stop_speed: f32,
+    jump_delta_v: f32,
+    crouch_jump_delta_v: f32,
+    acceleration_due_to_gravity: f32,
+}
+
+struct PlayerCollisionConfig {
+    player_standing_half_height: f32,
+    player_crouched_half_height: f32,
+    skin_depth: f32,
+    collider_radius: f32,
+}
+
 pub struct PlayerPlugin;
 
 impl Plugin for PlayerPlugin {
@@ -46,6 +64,27 @@ fn setup(
 ) {
     let player_spawn_point = Vec3::new(8.0, 1.0, -8.0);
     let camera_offset = Vec3::new(0.0, 1.25, 0.0);
+
+    let movement_config = PlayerMovementConfig {
+        acceleration: 80.0,
+        air_acceleration: 10.0,
+        max_run_speed: 5.5,
+        max_air_movement_speed: 4.0,
+        stop_speed: 1.5,
+        jump_delta_v: 7.5,
+        crouch_jump_delta_v: 6.0,
+        acceleration_due_to_gravity: 2.0 * 9.8,
+    };
+
+    let collider_config = PlayerCollisionConfig {
+        player_standing_half_height: 1.0,
+        player_crouched_half_height: 0.5,
+        skin_depth: 0.01,
+        collider_radius: 0.25,
+    };
+
+    commands.insert_resource(movement_config);
+    commands.insert_resource(collider_config);
 
     let player_entity =  commands
         .spawn()
@@ -102,27 +141,12 @@ fn attach_muzzle(
 
 fn move_player(
     time: Res<Time>,
+    movement_config: Res<PlayerMovementConfig>,
+    collider_config: Res<PlayerCollisionConfig>,
     mut player_input: ResMut<PlayerInput>,
     rapier_context: Res<RapierContext>,
     mut player_query: Query<(&mut Transform, &mut Player)>,
 ) {
-    // Movement Config - previous defaults as comments
-    let acceleration = 80.0; // 80.0
-    let air_acceleration = 10.0; // 10.0
-    let max_run_speed = 5.5; // 5.5
-    let max_air_movement_speed = 4.0; // 4.0
-    let stop_speed = 1.5; // 1.5
-
-    // Collider Values
-    let player_standing_half_height = 1.0;
-    let player_crouched_half_height = 0.5;
-    let skin_depth = 0.01;
-    let collider_radius = 0.25;
-
-    let jump_delta_v = 7.5; // 7.5
-    let crouch_jump_delta_v = 6.0;
-    let acceleration_due_to_gravity = 2.0 * 9.8; // 2 * 9.8
-
     let (mut player_transform, mut player) = player_query.iter_mut().last().unwrap();
 
     let terrain_filter = QueryFilter::only_fixed().groups(InteractionGroups::new(NamedCollisionGroups::Everything as u32, NamedCollisionGroups::Terrain as u32));
@@ -133,9 +157,9 @@ fn move_player(
     } else if player.is_crouched && !player_input.crouch_requested {
         player.is_crouched = false;
         // Ensure there is space to stand up!
-        let shape = Collider::capsule_y(player_standing_half_height - skin_depth - collider_radius, collider_radius);
+        let shape = Collider::capsule_y(collider_config.player_standing_half_height - collider_config.skin_depth - collider_config.collider_radius, collider_config.collider_radius);
         rapier_context.intersections_with_shape(
-            player_transform.translation + player_standing_half_height * Vec3::Y,
+            player_transform.translation + collider_config.player_standing_half_height * Vec3::Y,
             Quat::IDENTITY,
             &shape,
             terrain_filter,
@@ -145,8 +169,8 @@ fn move_player(
             }
         );
     }
-    let half_player_height = match player.is_crouched { false =>  player_standing_half_height, true => player_crouched_half_height };
-    let shape = Collider::capsule_y(half_player_height - skin_depth - collider_radius, collider_radius);
+    let half_player_height = match player.is_crouched { false =>  collider_config.player_standing_half_height, true => collider_config.player_crouched_half_height };
+    let shape = Collider::capsule_y(half_player_height - collider_config.skin_depth - collider_config.collider_radius, collider_config.collider_radius);
 
     let local_x = player_transform.local_x();
     let local_z = player_transform.local_z();
@@ -156,8 +180,6 @@ fn move_player(
     let local_z = Vec3::new(local_z.x, 0.0, local_z.z).normalize();
 
     let time_delta = time.delta_seconds();
-
-    let mut collision_disabled = false;
 
     // Transform movement input into world_space 
     let input_vector = player_input.movement_direction.x * local_x + player_input.movement_direction.z * local_z;
@@ -181,72 +203,126 @@ fn move_player(
 
     let mut target_velocity = player_xz_velocity;
     if player.is_grounded {
-        let max_movement_speed = max_run_speed; // May change in future to allow sprint & walk
-        let max_movement_speed_sqr = max_movement_speed * max_movement_speed;
-        let speed_sqr = player_xz_velocity.length_squared();
-        let is_sliding = speed_sqr > max_movement_speed_sqr + 0.001;
-        let any_input = player_input.movement_direction.length_squared() > 0.0;
-
-        if is_sliding {
-            // Apply linear slowing force
-            // Proportional to v can quickly result at velocity being negated at high speeds 
-            target_velocity *= 1.0 - (5.0 * time_delta).min(1.0);
-
-            // Only allow deceleration if moving faster than max movment speed
-            if player_xz_velocity.x.is_sign_positive() != input_vector.x.is_sign_positive() {
-                target_velocity.x += acceleration * time_delta * input_vector.x;
-            }
-            if player_xz_velocity.z.is_sign_positive() != input_vector.z.is_sign_positive() {
-                target_velocity.z += acceleration * time_delta * input_vector.z;
-            }
-        } else if any_input {
-            // Apply slow if input in opposite direction to velocity for faster change of direction
-            if player_xz_velocity.x.is_sign_positive() != input_vector.x.is_sign_positive() {
-                target_velocity.x *= 1.0 - (2.5 * speed_sqr.sqrt() * time_delta).min(1.0);
-            } 
-            if player_xz_velocity.z.is_sign_positive() != input_vector.z.is_sign_positive() {
-                target_velocity.z *= 1.0 - (2.5 * speed_sqr.sqrt() * time_delta).min(1.0);
-            }
-            target_velocity += acceleration * time_delta * input_vector;
-            
-            if target_velocity.length_squared() > max_movement_speed_sqr {
-                target_velocity = max_movement_speed * target_velocity.normalize();
-            }
-        } else {
-            if speed_sqr < stop_speed * stop_speed {
-                target_velocity = Vec3::ZERO;
-            } else {
-                target_velocity *= (2.5 * speed_sqr.sqrt() * time_delta).min(1.0)
-            }
-        }
+        calculate_target_grounded_velocity(&movement_config, player_xz_velocity, &player_input, &mut target_velocity, time_delta, input_vector);
     } else {
-        // Calcualte Air Movement
-        let target_x = player_xz_velocity.x + air_acceleration * time_delta * input_vector.x;
-        let target_z = player_xz_velocity.z + air_acceleration * time_delta * input_vector.z;
-        
-        let max_air_movement_speed_sqr = max_air_movement_speed * max_air_movement_speed;
-        let target_air_speed_sqr = target_x * target_x + target_z * target_z;
-        let can_accelerate = target_air_speed_sqr < max_air_movement_speed_sqr;
-
-        if can_accelerate || target_x.abs() < player_xz_velocity.x.abs() {
-            target_velocity.x = target_x;
-        }
-        if can_accelerate || target_z.abs() < player_xz_velocity.z.abs() {
-            target_velocity.z = target_z;
-        }
-
-        if !(target_velocity.x == target_x && target_velocity.z == target_z) {
-            // Must be above max air movement speed, and not trying to decelerate in both axes
-            let redirect_threshold_speed_sqr = (max_run_speed * max_run_speed).max(max_air_movement_speed_sqr);
-            let current_air_speed_sqr = target_velocity.length_squared(); 
-            if current_air_speed_sqr < redirect_threshold_speed_sqr {
-                // allow redirection of the direction of air movement if below redirect threshold
-                target_velocity = (current_air_speed_sqr.sqrt() / target_air_speed_sqr.sqrt()) * Vec3::new(target_x, 0.0, target_z);
-            }
-        }
+        calculate_target_air_velocity(player_xz_velocity, &movement_config, time_delta, input_vector, &mut target_velocity);
     }
 
     let start_translation = player_transform.translation;
+    move_xz(&mut player_transform, target_velocity, &rapier_context, half_player_height, &shape, time_delta, collider_config.skin_depth, terrain_filter);
+
+    // Handle requested y-movement / movement due to gravity
+    let vertical_velocity = match player_input.jump_requested {
+        true => { 
+            player_input.jump_requested = false;
+            match player.is_crouched {
+                true => movement_config.crouch_jump_delta_v,
+                false => movement_config.jump_delta_v,
+            }
+            // ^^ Air jump style - arrest all vertical momentum 
+        },
+        false => player.velocity.y - movement_config.acceleration_due_to_gravity * time_delta,
+    };
+
+    let direction = match vertical_velocity > 0.0 {
+        true => Vec3::Y,
+        false => Vec3::NEG_Y,
+    };
+
+    move_y(vertical_velocity, &mut player_transform, rapier_context, half_player_height, direction, shape, time_delta, collider_config.skin_depth, terrain_filter, &mut player);
+
+    player.velocity = (player_transform.translation - start_translation) / time_delta;
+}
+
+fn calculate_target_grounded_velocity(
+    movement_config: &Res<PlayerMovementConfig>,
+    player_xz_velocity: Vec3,
+    player_input: &ResMut<PlayerInput>,
+    target_velocity: &mut Vec3,
+    time_delta: f32,
+    input_vector: Vec3
+) {
+    let max_movement_speed = movement_config.max_run_speed;
+    // May change in future to allow sprint & walk
+    let max_movement_speed_sqr = max_movement_speed * max_movement_speed;
+    let speed_sqr = player_xz_velocity.length_squared();
+    let is_sliding = speed_sqr > max_movement_speed_sqr + 0.001;
+    let any_input = player_input.movement_direction.length_squared() > 0.0;
+    if is_sliding {
+        // Apply linear slowing force
+        // Proportional to v can quickly result at velocity being negated at high speeds 
+        *target_velocity *= 1.0 - (5.0 * time_delta).min(1.0);
+
+        // Only allow deceleration if moving faster than max movment speed
+        if player_xz_velocity.x.is_sign_positive() != input_vector.x.is_sign_positive() {
+            target_velocity.x += movement_config.acceleration * time_delta * input_vector.x;
+        }
+        if player_xz_velocity.z.is_sign_positive() != input_vector.z.is_sign_positive() {
+            target_velocity.z += movement_config.acceleration * time_delta * input_vector.z;
+        }
+    } else if any_input {
+        // Apply slow if input in opposite direction to velocity for faster change of direction
+        if player_xz_velocity.x.is_sign_positive() != input_vector.x.is_sign_positive() {
+            target_velocity.x *= 1.0 - (2.5 * speed_sqr.sqrt() * time_delta).min(1.0);
+        } 
+        if player_xz_velocity.z.is_sign_positive() != input_vector.z.is_sign_positive() {
+            target_velocity.z *= 1.0 - (2.5 * speed_sqr.sqrt() * time_delta).min(1.0);
+        }
+        *target_velocity += movement_config.acceleration * time_delta * input_vector;
+    
+        if target_velocity.length_squared() > max_movement_speed_sqr {
+            *target_velocity = max_movement_speed * target_velocity.normalize();
+        }
+    } else {
+        if speed_sqr < movement_config.stop_speed * movement_config.stop_speed {
+            *target_velocity = Vec3::ZERO;
+        } else {
+            *target_velocity *= (2.5 * speed_sqr.sqrt() * time_delta).min(1.0)
+        }
+    }
+}
+
+fn calculate_target_air_velocity(
+    player_xz_velocity: Vec3,
+    movement_config: &Res<PlayerMovementConfig>,
+    time_delta: f32,
+    input_vector: Vec3,
+    target_velocity: &mut Vec3
+) {
+    let target_x = player_xz_velocity.x + movement_config.air_acceleration * time_delta * input_vector.x;
+    let target_z = player_xz_velocity.z + movement_config.air_acceleration * time_delta * input_vector.z;
+    let max_air_movement_speed_sqr = movement_config.max_air_movement_speed * movement_config.max_air_movement_speed;
+    let target_air_speed_sqr = target_x * target_x + target_z * target_z;
+    let can_accelerate = target_air_speed_sqr < max_air_movement_speed_sqr;
+    if can_accelerate || target_x.abs() < player_xz_velocity.x.abs() {
+        target_velocity.x = target_x;
+    }
+    if can_accelerate || target_z.abs() < player_xz_velocity.z.abs() {
+        target_velocity.z = target_z;
+    }
+    if !(target_velocity.x == target_x && target_velocity.z == target_z) {
+        // Must be above max air movement speed, and not trying to decelerate in both axes
+        let redirect_threshold_speed_sqr = (movement_config.max_run_speed * movement_config.max_run_speed).max(max_air_movement_speed_sqr);
+        let current_air_speed_sqr = target_velocity.length_squared(); 
+        if current_air_speed_sqr < redirect_threshold_speed_sqr {
+            // allow redirection of the direction of air movement if below redirect threshold
+            *target_velocity = (current_air_speed_sqr.sqrt() / target_air_speed_sqr.sqrt()) * Vec3::new(target_x, 0.0, target_z);
+        }
+    }
+}
+
+fn move_xz(
+    player_transform: &mut Mut<Transform>,
+    target_velocity: Vec3,
+    rapier_context: &Res<RapierContext>,
+    half_player_height: f32,
+    shape: &Collider,
+    time_delta: f32,
+    skin_depth: f32,
+    collision_filter: QueryFilter,
+) {
+    let mut started_overlapping = false;
+    let reset_position = player_transform.translation;
     // Character Controller Move
     if target_velocity.length_squared() > 0.0 {
         let velocity_direction = target_velocity.normalize();
@@ -256,15 +332,15 @@ fn move_player(
             player_transform.translation + half_player_height * Vec3::Y,
             Quat::IDENTITY,
             velocity_direction,
-            &shape,
+            shape,
             time_delta * velocity_magnitude + skin_depth,
-            terrain_filter,
+            collision_filter,
         ) {
             if hit.toi == 0.0 {
                 // Already overlapping - should only happen if teleported or spawned inside collider
-                warn!("Started camera movement already overlapping, collision disabled");
+                warn!("Started movement already overlapping");
                 player_transform.translation += target_velocity * time_delta;
-                collision_disabled = true;
+                started_overlapping = true;
             } else {
                 // Desired movement collides, attempt to slide along surface
                 // NOTE: Casting in velocity direction means time of impact is in fact distance to impact
@@ -284,9 +360,9 @@ fn move_player(
                     player_transform.translation + half_player_height * Vec3::Y,
                     Quat::IDENTITY,
                     slide_velocity_direction,
-                    &shape,
+                    shape,
                     time_remainder * slide_velocity_magnitude + skin_depth,
-                    terrain_filter,
+                    collision_filter,
                 ) {
                     // slide also collides, attempt to one further slide in direction perpenticular to both hit normals
                     let second_slide_direction = hit.normal1.cross(second_hit.normal1);
@@ -306,7 +382,7 @@ fn move_player(
                             player_transform.translation,
                             Quat::IDENTITY,
                             slide_velocity.normalize(),
-                            &shape,
+                            shape,
                             time_remainder * slide_velocity.length() + skin_depth,
                             QueryFilter::default(),
                         )
@@ -323,42 +399,36 @@ fn move_player(
             player_transform.translation += target_velocity * time_delta;
         }
 
-        if !collision_disabled {
+        if !started_overlapping {
             rapier_context.intersections_with_shape(
                 player_transform.translation + half_player_height * Vec3::Y,
                 Quat::IDENTITY,
-                &shape,
-                terrain_filter,
+                shape,
+                collision_filter,
                 |_| {
                     // cast_shape sometimes lies about there being no collision due to float precision issues,
                     // so check for intersections and if found restore to starting position
                     warn!("Camera shape found to intersect world collider after movement, restoring to last valid position");
-                    player_transform.translation = start_translation;
+                    player_transform.translation = reset_position;
                     false
                 }
             );
         }
     }
+}
 
-    // Handle requested y-movement / movement due to gravity
-    let vertical_velocity = match player_input.jump_requested {
-        true => { 
-            player_input.jump_requested = false;
-            match player.is_crouched {
-                true => crouch_jump_delta_v,
-                false => jump_delta_v,
-            }
-            // ^^ Air jump style - arrest all vertical momentum 
-        },
-        false => player.velocity.y - acceleration_due_to_gravity * time_delta,
-    };
-
-    let direction = match vertical_velocity > 0.0 {
-        true => Vec3::Y,
-        false => Vec3::NEG_Y,
-    };
-
-    // Character Controller Move - again!
+fn move_y(
+    vertical_velocity: f32,
+    player_transform: &mut Mut<Transform>,
+    rapier_context: Res<RapierContext>,
+    half_player_height: f32,
+    direction: Vec3,
+    shape: Collider,
+    time_delta: f32,
+    skin_depth: f32,
+    collision_filter: QueryFilter,
+    player: &mut Mut<Player>
+) {
     if vertical_velocity.abs() > 0.0 {
         let reset_position = player_transform.translation;
         if let Some((_, hit)) = rapier_context.cast_shape(
@@ -367,7 +437,7 @@ fn move_player(
             direction,
             &shape,
             time_delta * vertical_velocity.abs() + skin_depth,
-            terrain_filter,
+            collision_filter,
         ) {
             let close_distance = hit.toi - skin_depth;
             player_transform.translation += direction * close_distance;
@@ -377,25 +447,21 @@ fn move_player(
             player.is_grounded = false;
         }
 
-        if !collision_disabled {
-            rapier_context.intersections_with_shape(
-                player_transform.translation + half_player_height * Vec3::Y,
-                Quat::IDENTITY,
-                &shape,
-                terrain_filter,
-                |_| {
-                    // cast_shape sometimes lies about there being no collision due to float precision issues,
-                    // so check for intersections and if found restore to starting position 
-                    // NOTE: Have not seen this in the wild with pure vertical movement, yet
-                    warn!("Camera shape found to intersect world collider after vertical movement, restoring to last valid position");
-                    player_transform.translation = reset_position;
-                    false
-                },
-            );
-        }
+        rapier_context.intersections_with_shape(
+            player_transform.translation + half_player_height * Vec3::Y,
+            Quat::IDENTITY,
+            &shape,
+            collision_filter,
+            |_| {
+                // cast_shape sometimes lies about there being no collision due to float precision issues,
+                // so check for intersections and if found restore to starting position 
+                // NOTE: Have not seen this in the wild with pure vertical movement, yet
+                warn!("Camera shape found to intersect world collider after vertical movement, restoring to last valid position");
+                player_transform.translation = reset_position;
+                false
+            },
+        );
     }
-
-    player.velocity = (player_transform.translation - start_translation) / time_delta;
 }
 
 pub fn update_look(
