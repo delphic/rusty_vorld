@@ -1,4 +1,4 @@
-use bevy::prelude::*;
+use bevy::{prelude::*, app::PluginGroupBuilder};
 use bevy_hanabi::*;
 use bevy_rapier3d::prelude::*;
 
@@ -25,25 +25,25 @@ fn main() {
         .add_plugin(HanabiPlugin)
         .add_plugin(RapierPhysicsPlugin::<NoUserData>::default())
         //.add_plugin(RapierDebugRenderPlugin::default())
-        .add_plugin(VorldPlugin)
+        .add_plugins(VorldPlugins)
         .run();
 }
 
-pub struct VorldPlugin;
+pub struct VorldPlugins;
 
-impl Plugin for VorldPlugin {
-    fn build(&self, app: &mut App) {
-        app.add_plugin(GamePlugin);
-        app.add_plugin(voxel::VoxelPlugin);
-        app.add_plugin(player_input::PlayerInputPlugin);
-        app.add_plugin(projectile::ProjectilePlugin);
-        app.add_plugin(health::HealthPlugin);
-        app.add_plugin(npc_spawner::NpcSpawnerPlugin);
-        app.add_plugin(scene_spawner::SceneSpawnerPlugin);
-        app.add_plugin(gun::GunPlugin);
-        app.add_plugin(player::PlayerPlugin);
-        app.add_plugin(hit_flash::HitFlashPlugin);
-        app.add_plugin(zombie::NpcAiPlugin);
+impl PluginGroup for VorldPlugins {
+    fn build(&mut self, group: &mut PluginGroupBuilder) {
+        group.add(GamePlugin);
+        group.add(voxel::VoxelPlugin);
+        group.add(player_input::PlayerInputPlugin);
+        group.add(projectile::ProjectilePlugin);
+        group.add(health::HealthPlugin);
+        group.add(npc_spawner::NpcSpawnerPlugin);
+        group.add(scene_spawner::SceneSpawnerPlugin);
+        group.add(gun::GunPlugin);
+        group.add(player::PlayerPlugin);
+        group.add(hit_flash::HitFlashPlugin);
+        group.add(zombie::NpcAiPlugin);
     }
 }
 
