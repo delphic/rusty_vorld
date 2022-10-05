@@ -3,7 +3,7 @@ use bevy_rapier3d::prelude::*;
 
 use super::lifetime::*;
 use super::named_collision_groups::*;
-use super::input::PlayerInput;
+use super::player_input::PlayerInput;
 use super::projectile::Projectile;
 
 pub struct BulletMeshMaterial {
@@ -14,7 +14,16 @@ pub struct BulletMeshMaterial {
 #[derive(Component)]
 pub struct Muzzle;
 
-pub fn setup(
+pub struct GunPlugin;
+
+impl Plugin for GunPlugin {
+    fn build(&self, app: &mut App) {
+        app.add_startup_system(setup);
+        app.add_system(shoot);
+    }
+}
+
+fn setup(
     mut commands: Commands,
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
@@ -28,7 +37,7 @@ pub fn setup(
     commands.insert_resource(BulletMeshMaterial { mesh, material });
 }
 
-pub fn shoot(
+fn shoot(
     mut commands: Commands,
     bullet_assets: Res<BulletMeshMaterial>,
     mut player_input: ResMut<PlayerInput>,

@@ -12,7 +12,17 @@ pub struct ProjectileImpactEvent {
     pub hit_entity: Entity,
 }
 
-pub fn setup(
+pub struct ProjectilePlugin;
+
+impl Plugin for ProjectilePlugin {
+    fn build(&self, app: &mut App) {
+        app.add_event::<ProjectileImpactEvent>();
+        app.add_startup_system(setup);
+        app.add_system(detect_projectile_impact);
+    }
+}
+
+fn setup(
     mut commands: Commands,
     mut effect_assets: ResMut<Assets<EffectAsset>>,
 ) {

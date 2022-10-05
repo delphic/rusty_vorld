@@ -1,4 +1,3 @@
-use super::atlas_loader::AtlasTexture;
 use super::mesher;
 use super::named_collision_groups::*;
 use bevy::prelude::*;
@@ -7,6 +6,7 @@ use bevy_rapier3d::prelude::*;
 use futures_lite::future;
 use std::collections::HashMap;
 
+pub mod atlas_loader;
 pub mod block_ids;
 pub mod chunk;
 pub mod direction;
@@ -26,22 +26,27 @@ pub struct VoxelConfig {
     pub id_to_tile: [[u32; 6]; 256],
 }
 
-pub fn init(app: &mut App) {
-    let mut look_up = [[0; 6]; 256];
-    look_up[BlockIds::Grass as usize] = [1, 1, 0, 2, 1, 1];
-    look_up[BlockIds::Soil as usize] = [2, 2, 2, 2, 2, 2];
-    look_up[BlockIds::Stone as usize] = [3, 3, 3, 3, 3, 3];
-    look_up[BlockIds::StoneSlab as usize] = [ 5, 5, 6, 6, 5, 5]; 
-    look_up[BlockIds::StoneBlocks as usize] = [4, 4, 5, 5, 4, 4];
-    look_up[BlockIds::Wood as usize] = [9, 9, 8, 8, 9, 9];
-    look_up[BlockIds::Planks as usize] = [10, 10, 10, 10, 10, 10];
-    look_up[BlockIds::Debug as usize] = [17, 18, 15, 16, 20, 19];
-    look_up[BlockIds::Rink as usize] = [21, 21, 21, 21, 21, 21];
-    app.insert_resource(VoxelConfig {
-        id_to_tile: look_up,
-    });
-    app.add_startup_system(setup);
-    app.add_system(handle_meshing_tasks);
+pub struct VoxelPlugin;
+
+impl Plugin for VoxelPlugin {
+    fn build(&self, app: &mut App) {
+        atlas_loader::init(app);
+        let mut look_up = [[0; 6]; 256];
+        look_up[BlockIds::Grass as usize] = [1, 1, 0, 2, 1, 1];
+        look_up[BlockIds::Soil as usize] = [2, 2, 2, 2, 2, 2];
+        look_up[BlockIds::Stone as usize] = [3, 3, 3, 3, 3, 3];
+        look_up[BlockIds::StoneSlab as usize] = [ 5, 5, 6, 6, 5, 5]; 
+        look_up[BlockIds::StoneBlocks as usize] = [4, 4, 5, 5, 4, 4];
+        look_up[BlockIds::Wood as usize] = [9, 9, 8, 8, 9, 9];
+        look_up[BlockIds::Planks as usize] = [10, 10, 10, 10, 10, 10];
+        look_up[BlockIds::Debug as usize] = [17, 18, 15, 16, 20, 19];
+        look_up[BlockIds::Rink as usize] = [21, 21, 21, 21, 21, 21];
+        app.insert_resource(VoxelConfig {
+            id_to_tile: look_up,
+        });
+        app.add_startup_system(setup);
+        app.add_system(handle_meshing_tasks);
+    }
 }
 
 #[derive(Component)]
@@ -231,7 +236,7 @@ pub fn async_instantiate_world(commands: &mut Commands, world: &Vorld, voxel_con
 fn handle_meshing_tasks(
     mut commands: Commands,
     mut meshing_tasks: Query<(Entity, &mut ComputeChunkMeshes)>,
-    atlas: Res<AtlasTexture>,
+    atlas: Res<atlas_loader::AtlasTexture>,
     mut meshes: ResMut<Assets<Mesh>>,
 ) {
     for (entity, mut task) in meshing_tasks.iter_mut() {

@@ -2,11 +2,10 @@ use bevy::prelude::*;
 use bevy_hanabi::*;
 use bevy_rapier3d::prelude::*;
 
-mod atlas_loader;
 mod gun;
 mod health;
 mod hit_flash;
-mod input;
+mod player_input;
 mod lifetime;
 mod mesher;
 mod named_collision_groups;
@@ -34,36 +33,33 @@ pub struct VorldPlugin;
 
 impl Plugin for VorldPlugin {
     fn build(&self, app: &mut App) {
+        app.add_plugin(GamePlugin);
+        app.add_plugin(voxel::VoxelPlugin);
+        app.add_plugin(player_input::PlayerInputPlugin);
+        app.add_plugin(projectile::ProjectilePlugin);
+        app.add_plugin(health::HealthPlugin);
+        app.add_plugin(npc_spawner::NpcSpawnerPlugin);
+        app.add_plugin(scene_spawner::SceneSpawnerPlugin);
+        app.add_plugin(gun::GunPlugin);
+        app.add_plugin(player::PlayerPlugin);
+        app.add_plugin(hit_flash::HitFlashPlugin);
+        app.add_plugin(zombie::NpcAiPlugin);
+    }
+}
+
+struct GamePlugin;
+
+impl Plugin for GamePlugin {
+    fn build(&self, app: &mut App) {
+        // Core Systems
         app.insert_resource(GameState {
             cursor_locked: false,
         });
-        atlas_loader::init(app);
-        voxel::init(app);
-        input::insert_resources(app);
-        app.add_event::<projectile::ProjectileImpactEvent>();
-        app.add_event::<health::TakeDamageEvent>();
-        app.add_startup_system(npc_spawner::setup);
-        app.add_system(npc_spawner::handle_asset_load);
-        app.add_system(npc_spawner::handle_find_animation_player_request);
-        app.add_system(npc_spawner::handle_clone_model_materials_request);
-        app.add_startup_system(scene_spawner::spawn_lighting);
-        app.add_startup_system(gun::setup);
-
         app.add_system(grab_mouse);
-        input::add_systems(app);
-        player::add_systems(app);
-        
-        app.add_system(gun::shoot);
-        app.add_startup_system(projectile::setup);
-        app.add_system(projectile::detect_projectile_impact);
-        app.add_system(health::handle_projectile_impact.after(projectile::detect_projectile_impact));
+
+        // Simple systems
         app.add_system(lifetime::update);
         app.add_system(smoothed_follow::follow.after(player::update_look));
-
-        app.add_system(hit_flash::update_hit_flash);
-        app.add_system(hit_flash::handle_take_damage_event);
-
-        app.add_system(zombie::seek_brains);
     }
 }
 

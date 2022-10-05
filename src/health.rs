@@ -1,6 +1,7 @@
 use bevy::prelude::*;
 use bevy_rapier3d::prelude::*;
 
+use super::projectile;
 use super::projectile::*;
 
 #[derive(Component)]
@@ -24,7 +25,16 @@ impl Health {
     }
 }
 
-pub fn handle_projectile_impact(
+pub struct HealthPlugin;
+
+impl Plugin for HealthPlugin {
+    fn build(&self, app: &mut App) {
+        app.add_event::<TakeDamageEvent>();
+        app.add_system(handle_projectile_impact.after(projectile::detect_projectile_impact));
+    }
+}
+
+fn handle_projectile_impact(
     mut commands: Commands,
     mut projectile_event_reader: EventReader<ProjectileImpactEvent>,
     mut take_damage_event_writer: EventWriter<TakeDamageEvent>,

@@ -18,7 +18,16 @@ pub struct HitFlashSupport {
     pub flash_color: Color,
 }
 
-pub fn handle_take_damage_event(
+pub struct HitFlashPlugin;
+
+impl Plugin for HitFlashPlugin {
+    fn build(&self, app: &mut App) {
+        app.add_system(update_hit_flash);
+        app.add_system(handle_take_damage_event);
+    }
+}
+
+fn handle_take_damage_event(
     mut commands: Commands,
     mut take_damage_event_reader: EventReader<TakeDamageEvent>,
     hit_support_query: Query<&HitFlashSupport>,
@@ -36,7 +45,7 @@ pub fn handle_take_damage_event(
     }
 }
 
-pub fn update_hit_flash(
+fn update_hit_flash(
     time: Res<Time>,
     mut commands: Commands,
     mut material_assets: ResMut<Assets<StandardMaterial>>,

@@ -2,7 +2,15 @@ use bevy::prelude::*;
 use bevy_rapier3d::prelude::*;
 use super::named_collision_groups::*;
 
-pub fn spawn_lighting(mut commands: Commands) {
+pub struct SceneSpawnerPlugin;
+
+impl Plugin for SceneSpawnerPlugin {
+    fn build(&self, app: &mut App) {
+        app.add_startup_system(spawn_lighting);
+    }
+}
+
+fn spawn_lighting(mut commands: Commands) {
     commands.insert_resource(AmbientLight::default());
 
     commands.spawn_bundle(DirectionalLightBundle {

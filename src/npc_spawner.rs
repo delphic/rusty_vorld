@@ -24,7 +24,18 @@ pub struct FindAnimationPlayerRequest;
 #[derive(Component)]
 pub struct CloneModelMaterialsRequest;
 
-pub fn setup(
+pub struct NpcSpawnerPlugin;
+
+impl Plugin for NpcSpawnerPlugin {
+    fn build(&self, app: &mut App) {
+        app.add_startup_system(setup);
+        app.add_system(handle_asset_load);
+        app.add_system(handle_find_animation_player_request);
+        app.add_system(handle_clone_model_materials_request);
+    }
+}
+
+fn setup(
     mut commands: Commands,
     asset_server: Res<AssetServer>,
 ) {
@@ -38,7 +49,7 @@ pub fn setup(
     });
 }
 
-pub fn handle_asset_load(
+fn handle_asset_load(
     mut commands: Commands,
     mut npc_assets: ResMut<NpcAssets>,
     mut meshes: ResMut<Assets<Mesh>>,
@@ -88,7 +99,7 @@ pub fn handle_asset_load(
     }
 }
 
-pub fn handle_find_animation_player_request(
+fn handle_find_animation_player_request(
     mut commands: Commands, 
     mut request_query: Query<(Entity, &mut Npc), With<FindAnimationPlayerRequest>>,
     hierarchy_query: Query<(&Children, Option<&AnimationPlayer>)>,
@@ -102,7 +113,7 @@ pub fn handle_find_animation_player_request(
     }
 }
 
-pub fn handle_clone_model_materials_request(
+fn handle_clone_model_materials_request(
     mut commands: Commands, 
     mut request_query: Query<Entity, With<CloneModelMaterialsRequest>>,
     mut materials: ResMut<Assets<StandardMaterial>>,

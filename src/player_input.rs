@@ -8,18 +8,19 @@ pub struct PlayerInput {
     pub shoot_requested: bool,
 }
 
-pub fn insert_resources(app: &mut App) {
-    app.insert_resource(PlayerInput {
-        mouse_motion: Vec2::ZERO,
-        movement_direction: Vec3::ZERO,
-        jump_requested: false,
-        crouch_requested: false,
-        shoot_requested: false,
-    });
-}
+pub struct PlayerInputPlugin;
 
-pub fn add_systems(app: &mut App) {
-    app.add_system(detect_player_input);
+impl Plugin for PlayerInputPlugin {
+    fn build(&self, app: &mut App) {
+        app.insert_resource(PlayerInput {
+            mouse_motion: Vec2::ZERO,
+            movement_direction: Vec3::ZERO,
+            jump_requested: false,
+            crouch_requested: false,
+            shoot_requested: false,
+        });
+        app.add_system(detect_player_input);
+    }
 }
 
 fn detect_player_input(

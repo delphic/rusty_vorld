@@ -2,7 +2,7 @@ use bevy::prelude::*;
 use bevy_rapier3d::prelude::*;
 
 use super::gun;
-use super::input::PlayerInput;
+use super::player_input::PlayerInput;
 use super::named_collision_groups::*;
 use super::smoothed_follow::SmoothedFollow;
 use super::utils;
@@ -29,11 +29,15 @@ pub struct AttachMuzzleRequest {
     entity: Entity
 }
 
-pub fn add_systems(app: &mut App) {
-    app.add_startup_system(setup)
-        .add_system(attach_muzzle)
-        .add_system(move_player)
-        .add_system(update_look.after(move_player));
+pub struct PlayerPlugin;
+
+impl Plugin for PlayerPlugin {
+    fn build(&self, app: &mut App) {
+        app.add_startup_system(setup)
+            .add_system(attach_muzzle)
+            .add_system(move_player)
+            .add_system(update_look.after(move_player));
+    }
 }
 
 fn setup(

@@ -22,7 +22,15 @@ impl Zombie {
     }
 }
 
-pub fn seek_brains(
+pub struct NpcAiPlugin;
+
+impl Plugin for NpcAiPlugin {
+    fn build(&self, app: &mut App) {
+        app.add_system(seek_brains);
+    }
+}
+
+fn seek_brains(
     time: Res<Time>,
     npc_assets: Res<NpcAssets>,
     player_query: Query<&Transform, (With<Player>, Without<Zombie>)>,
